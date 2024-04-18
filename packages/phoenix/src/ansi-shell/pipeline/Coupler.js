@@ -24,7 +24,9 @@ export class Coupler {
         Does not close the write stream when the read stream is closed.
     `
 
-    constructor (source, target) {
+    constructor (source, target, debug) {
+        this.debug = debug || false;
+        console.log('creating coupler. source is', this.source);
         this.source = source;
         this.target = target;
         this.on_ = true;
@@ -39,8 +41,9 @@ export class Coupler {
     on () { this.on_ = true; }
 
     close () {
+        if (this.debug) console.log('closing coupler. source is', this.source);
+        this.source.releaseLock();
         this.closed_.resolve({
-            value: undefined,
             done: true,
         });
     }

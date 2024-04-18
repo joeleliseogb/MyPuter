@@ -203,7 +203,7 @@ export class PreparedCommand {
         }
 
         const internal_input_pipe = new Pipe();
-        const valve = new Coupler(in_, internal_input_pipe.in);
+        const valve = new Coupler(in_, internal_input_pipe.in, true);
         in_ = internal_input_pipe.out;
 
         // simple naive implementation for now

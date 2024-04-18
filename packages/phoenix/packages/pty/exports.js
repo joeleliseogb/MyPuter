@@ -34,22 +34,25 @@ export class BetterReader {
 
         const chunk = await this.getChunk_();
 
-        if ( ! opt_buffer ) {
+        if ( ! opt_buffer || ! chunk ) {
             return chunk;
         }
 
         this.chunks_.push(chunk);
 
         while ( this.getTotalBytesReady_() < opt_buffer.length ) {
-            this.chunks_.push(await this.getChunk_())
+            const read_chunk = await this.getChunk_();
+            if ( ! read_chunk ) {
+                break;
+            }
+            this.chunks_.push(read_chunk);
         }
 
-        // TODO: need to handle EOT condition in this loop
         let offset = 0;
-        for (;;) {
+        while ( this.chunks_.length > 0 && offset < opt_buffer.length ) {
             let item = this.chunks_.shift();
             if ( item === undefined ) {
-                throw new Error('calculation is wrong')
+                break;
             }
             if ( offset + item.length > opt_buffer.length ) {
                 const diff = opt_buffer.length - offset;
@@ -58,16 +61,16 @@ export class BetterReader {
             }
             opt_buffer.set(item, offset);
             offset += item.length;
-
-            if ( offset == opt_buffer.length ) break;
         }
 
-        // return opt_buffer.length;
+        return offset;
     }
 
     async getChunk_() {
         if ( this.chunks_.length === 0 ) {
-            const { value } = await this.delegate.read();
+            const { value } = await this.delegate.read().catch( ( err ) => {
+                return {};
+            });
             return value;
         }
 
@@ -86,6 +89,11 @@ export class BetterReader {
 
     getTotalBytesReady_ () {
         return this.chunks_.reduce((sum, chunk) => sum + chunk.length, 0);
+    }
+
+    async releaseLock() {
+        console.log('cancelling betterreader, delegate is', this.delegate);
+        await this.delegate.releaseLock();
     }
 }
 

@@ -57,7 +57,10 @@ const ReadlineProcessorBuilder = builder => builder
         const { locals, externs } = ctx;
 
         const byteBuffer = new Uint8Array(1);
-        await externs.in_.read(byteBuffer);
+        const bytesRead = await externs.in_.read(byteBuffer);
+        if (bytesRead !== 1) {
+            console.warn('Failed to read byte in get-byte state of readline');
+        }
         locals.byteBuffer = byteBuffer;
         locals.byte = byteBuffer[0];
     })
