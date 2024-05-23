@@ -42,6 +42,7 @@ const generate_puter_page_html = ({
         short_description,
         company,
         canonical_url,
+        icon,
     } = meta;
 
     gui_params = {
@@ -60,6 +61,8 @@ const generate_puter_page_html = ({
 
     const bundled = env != 'dev' || use_bundled_gui;
 
+    const icon_url = icon || `${asset_dir}/images/screenshot.png`;
+
     return `<!DOCTYPE html>
 <html lang="en">
 
@@ -71,19 +74,19 @@ const generate_puter_page_html = ({
     <link rel="canonical" href="${e(canonical_url)}">
 
     <!-- Meta meta tags -->
-    <meta property="og:url" content="${app_origin}">
+    <meta property="og:url" content="${e(canonical_url)}">
     <meta property="og:type" content="website">
     <meta property="og:title" content="${e(title)}">
     <meta property="og:description" content="${e((short_description).replace(/\n/g, " "))}">
-    <meta property="og:image" content="${asset_dir}/images/screenshot.png">
+    <meta property="og:image" content="${e(icon_url)}">
 
     <!-- Twitter meta tags -->
     <meta name="twitter:card" content="summary_large_image">
     <meta property="twitter:domain" content="puter.com">
-    <meta property="twitter:url" content="${app_origin}">
+    <meta property="twitter:url" content="${e(canonical_url)}">
     <meta name="twitter:title" content="${e(title)}">
     <meta name="twitter:description" content="${e((short_description).replace(/\n/g, " "))}">
-    <meta name="twitter:image" content="${asset_dir}/images/screenshot.png">
+    <meta name="twitter:image" content="${e(icon_url)}">
 
     <!-- favicons -->
     <link rel="apple-touch-icon" sizes="57x57" href="${asset_dir}/favicons/apple-icon-57x57.png">
