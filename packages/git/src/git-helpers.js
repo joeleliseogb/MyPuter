@@ -23,7 +23,7 @@ import path from 'path-browserify';
  * @throws Error If no git repository could be found, or another error occurred.
  * @param fs Filesystem API
  * @param pwd Directory to search from
- * @returns {Promise<{repository_dir: (string|*), git_dir: (string|string)}>}
+ * @returns {Promise<{dir: (string|*), gitdir: (string|string)}>} dir and gitdir are the same as in git.foo({dir, gitdir}) APIs.
  */
 export const find_repo_root = async (fs, pwd) => {
     if (!path.isAbsolute(pwd))
@@ -51,8 +51,8 @@ export const find_repo_root = async (fs, pwd) => {
         // TODO: The git cli seems to check other things, maybe try to match that behaviour.
 
         const result = {
-            repository_dir: current_path,
-            git_dir: current_git_path,
+            dir: current_path,
+            gitdir: current_git_path,
         };
 
         // Non-default-git-folder repos have .git as a text file containing the git dir path.
@@ -62,7 +62,7 @@ export const find_repo_root = async (fs, pwd) => {
             const prefix = 'gitdir:';
             if (!contents.startsWith(prefix))
                 throw new Error(`invalid gitfile format: ${current_git_path}`);
-            result.git_dir = contents.slice(prefix.length).trim();
+            result.gitdir = contents.slice(prefix.length).trim();
         }
 
         return result;
@@ -81,4 +81,59 @@ export const find_repo_root = async (fs, pwd) => {
 export const shorten_hash = (hash) => {
     // TODO: Ensure that whatever we produce is unique within the repo
     return hash.slice(0, 7);
+}
+
+/**
+ * Determine the remot/url parameters to pass to git.fetch(), based on a `<repository>` string.
+ * @param remote_name_or_url Command-line parameter, either a remote name, an url, or undefined.
+ * @param remotes List of all existing remotes, from `git.listRemotes()`
+ * @returns {remote, url} Object with fields to pass to git.fetch() or similar.
+ */
+export const determine_fetch_remote = (remote_name_or_url, remotes) => {
+    if (!remote_name_or_url) {
+        // We leave `url` and `remote` blank and git.fetch() handles the default.
+        return {};
+    }
+
+    if (URL.canParse(remote_name_or_url)) {
+        return { url: remote_name_or_url };
+    }
+
+    // Named remote. First, check if the remote exists. `git.fetch` reports non-existent remotes as:
+    //     "The function requires a "remote OR url" parameter but none was provided."
+    // ...which is not helpful to the user.
+    const remote_data = remotes.find(it => it.remote === remote_name_or_url);
+    if (!remote_data)
+        throw new Error(`'${remote_name_or_url}' does not appear to be a git repository`);
+    return remote_data;
+}
+
+/**
+ * Divide up the positional arguments into those before the `--` separator, and those after it.
+ * @param arg_tokens Tokens array from parseArgs({ tokens: true })
+ * @returns {{before: string[], after: string[]}}
+ */
+export const group_positional_arguments = (arg_tokens) => {
+    let saw_separator = false;
+    const result = {
+        before: [],
+        after: [],
+    };
+
+    for (const token of arg_tokens) {
+        if (token.kind === 'option-terminator') {
+            saw_separator = true;
+            continue;
+        }
+        if (token.kind === 'positional') {
+            if (saw_separator) {
+                result.after.push(token.value);
+            } else {
+                result.before.push(token.value);
+            }
+            continue;
+        }
+    }
+
+    return result;
 }

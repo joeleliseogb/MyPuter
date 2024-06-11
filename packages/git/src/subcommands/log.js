@@ -16,18 +16,29 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-import git from 'isomorphic-git';
-import { find_repo_root } from '../git-helpers.js';
-import { commit_formatting_options, format_commit, process_commit_formatting_options } from '../format.js';
+import git, { TREE } from 'isomorphic-git';
+import { find_repo_root, group_positional_arguments } from '../git-helpers.js';
+import {
+    commit_formatting_options,
+    diff_formatting_options,
+    format_commit, format_diffs,
+    process_commit_formatting_options,
+    process_diff_formatting_options,
+} from '../format.js';
+import path from 'path-browserify';
+import { SHOW_USAGE } from '../help.js';
+import { diff_git_trees } from '../diff.js';
 
 export default {
     name: 'log',
-    usage: 'git log [<formatting-option>...] [--max-count <n>] <revision>',
+    usage: 'git log [<formatting-option>...] [--max-count <n>] [<revision>] [[--] <path>]',
     description: 'Show commit logs, starting at the given revision.',
     args: {
-        allowPositionals: false,
+        allowPositionals: true,
+        tokens: true,
         options: {
             ...commit_formatting_options,
+            ...diff_formatting_options,
             'max-count': {
                 description: 'Maximum number of commits to output.',
                 type: 'string',
@@ -38,27 +49,49 @@ export default {
     execute: async (ctx) => {
         const { io, fs, env, args } = ctx;
         const { stdout, stderr } = io;
-        const { options, positionals } = args;
+        const { options, positionals, tokens } = args;
+        const cache = {};
 
         process_commit_formatting_options(options);
-
-        // TODO: Log of a specific file
-        // TODO: Log of a specific branch
-        // TODO: Log of a specific commit
+        const diff_options = process_diff_formatting_options(options, { show_patch_by_default: false });
 
         const depth = Number(options['max-count']) || undefined;
 
-        const { repository_dir, git_dir } = await find_repo_root(fs, env.PWD);
+        const { dir, gitdir } = await find_repo_root(fs, env.PWD);
+
+        const { before: refs, after: paths } = group_positional_arguments(tokens);
+        if (refs.length > 1 || paths.length > 1) {
+            stderr('error: Too many revisions or paths given. Expected [<revision>] [[--] <path>]');
+            throw SHOW_USAGE;
+        }
 
         const log = await git.log({
             fs,
-            dir: repository_dir,
-            gitdir: git_dir,
+            dir,
+            gitdir,
             depth,
+            ref: refs[0],
+            filepath: paths[0],
         });
+        const diff_ctx = {
+            fs, dir, gitdir, cache, env,
+            context_lines: diff_options.context_lines,
+            path_filters: paths.map(it => path.resolve(env.PWD, it)),
+        };
+        const read_tree = walker => walker?.content()?.then(it => new TextDecoder().decode(it));
 
         for (const commit of log) {
             stdout(format_commit(commit.commit, commit.oid, options));
+            if (diff_options.display_diff()) {
+                const diffs = await diff_git_trees({
+                    ...diff_ctx,
+                    a_tree: TREE({ ref: commit.oid }),
+                    b_tree: TREE({ ref: commit.commit.parent[0] }),
+                    read_a: read_tree,
+                    read_b: read_tree,
+                });
+                stdout(format_diffs(diffs, diff_options));
+            }
         }
     }
 }

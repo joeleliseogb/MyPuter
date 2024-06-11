@@ -17,8 +17,6 @@
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 import git from 'isomorphic-git';
-import path from 'path-browserify';
-import { ErrorCodes } from '@heyputer/puter-js-common/src/PosixError.js';
 import { find_repo_root, shorten_hash } from '../git-helpers.js';
 
 export default {
@@ -51,7 +49,7 @@ export default {
             return 1;
         }
 
-        const { repository_dir, git_dir } = await find_repo_root(fs, env.PWD);
+        const { dir, gitdir } = await find_repo_root(fs, env.PWD);
 
         let user_name;
         let user_email;
@@ -66,14 +64,14 @@ export default {
         } else {
             user_name = await git.getConfig({
                 fs,
-                dir: repository_dir,
-                gitdir: git_dir,
+                dir,
+                gitdir,
                 path: 'user.name',
             });
             user_email = await git.getConfig({
                 fs,
-                dir: repository_dir,
-                gitdir: git_dir,
+                dir,
+                gitdir,
                 path: 'user.email',
             });
         }
@@ -84,8 +82,8 @@ export default {
 
         const commit_hash = await git.commit({
             fs,
-            dir: repository_dir,
-            gitdir: git_dir,
+            dir,
+            gitdir,
             message: options.message,
             author: {
                 name: user_name,
@@ -95,8 +93,8 @@ export default {
 
         const branch = await git.currentBranch({
             fs,
-            dir: repository_dir,
-            gitdir: git_dir,
+            dir,
+            gitdir,
         });
         const commit_title = options.message.split('\n')[0];
         const short_hash = shorten_hash(commit_hash);
