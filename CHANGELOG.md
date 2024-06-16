@@ -1,5 +1,50 @@
 # Changelog
 
+## [2.4.0](https://github.com/joeleliseogb/MyPuter/compare/v2.3.0...v2.4.0) (2024-06-16)
+
+
+### Features
+
+* add /share/file-by-username endpoint ([5d214c7](https://github.com/joeleliseogb/MyPuter/commit/5d214c7b52887b594af6be497f1892baf7d77679))
+* add /show urls ([079e25a](https://github.com/joeleliseogb/MyPuter/commit/079e25a9fe8e179f26d72378856058eb656e2314))
+* add cross-server event broadcasting ([1207a15](https://github.com/joeleliseogb/MyPuter/commit/1207a158bdc88a90b14d31d03387ce353c176a9c))
+* add external mod loading ([eb05fbd](https://github.com/joeleliseogb/MyPuter/commit/eb05fbd2dc4877553b5118a069a9afdc32bea137))
+* add mark-read endpoint ([0101f42](https://github.com/joeleliseogb/MyPuter/commit/0101f425d480705c20df4919a76f66e987f5790f))
+* add readdir delegate for shares in a user directory ([8424d44](https://github.com/joeleliseogb/MyPuter/commit/8424d446099ac30ccf829c57d43eef1f235618e4))
+* add readdir delegate for sharing user homedirs ([19a5eb0](https://github.com/joeleliseogb/MyPuter/commit/19a5eb00763f3ac31df8483fb59cb7a96c448745))
+* add service for notifications ([a1e6887](https://github.com/joeleliseogb/MyPuter/commit/a1e6887bf93da21b9482040b3e30ee083fb23477))
+* **backend:** add script service ([30550fc](https://github.com/joeleliseogb/MyPuter/commit/30550fcddda18469735499546de502d29b85e2ad))
+* **backend:** add tip of day ([2d8e624](https://github.com/joeleliseogb/MyPuter/commit/2d8e6240c61dc6301f49cbdcd1c3b04736f9ca93))
+* **backend:** allow services to provide user properties ([522664d](https://github.com/joeleliseogb/MyPuter/commit/522664d415c33342500defec309c2ff15bc94804))
+* **backend:** allow services to provide whoami values ([fccabf1](https://github.com/joeleliseogb/MyPuter/commit/fccabf1bc0c4418f3599222616dd63bf98c14fe1))
+* **backend:** improve logger and reduce logs ([4bdad75](https://github.com/joeleliseogb/MyPuter/commit/4bdad75766d0617a164024b39b79bf5373c495a6))
+* introduce notification selection via driver ([c5334b0](https://github.com/joeleliseogb/MyPuter/commit/c5334b0e19cf9762f536ec482c3ff872e9c12399))
+* **parsely:** Add a fail() parser ([5656d9d](https://github.com/joeleliseogb/MyPuter/commit/5656d9d42f76202a534ad640d3a4e287e0e40418))
+* **parsely:** Add stringUntil() parser ([d46b043](https://github.com/joeleliseogb/MyPuter/commit/d46b043c5d16f1205d61de3f3ba43ed8ad7bff93))
+* **phoenix:** Add --dump and --file options to sed ([f250f86](https://github.com/joeleliseogb/MyPuter/commit/f250f86446a506f24fa2ad396328e3a2212a68d0))
+* **phoenix:** Add more commands to sed, including labels and branching ([306014a](https://github.com/joeleliseogb/MyPuter/commit/306014adc77a7ca155feb95d1146cb46ee075b52))
+* **phoenix:** Expose parsed arg tokens to apps that request them ([4067c82](https://github.com/joeleliseogb/MyPuter/commit/4067c82486c99cad20f41927ad39ebea438b717f))
+* **phoenix:** Implement parsing of sed scripts ([0d4f907](https://github.com/joeleliseogb/MyPuter/commit/0d4f907b6675b15bd50a55f50aa28f0803b18b7b))
+* re-send unreads on login ([02fc4d8](https://github.com/joeleliseogb/MyPuter/commit/02fc4d86b7166fb4803be5d28e2a593d6b7d9785))
+* send notification when file gets shared ([2f6c428](https://github.com/joeleliseogb/MyPuter/commit/2f6c428a403a006f7878861d2f0356c3294519be))
+* **ui:** add new components ([577bd59](https://github.com/joeleliseogb/MyPuter/commit/577bd59b6cc94810e851ad544f8234e25a4e6e27))
+* **ui:** add new components ([38ba425](https://github.com/joeleliseogb/MyPuter/commit/38ba42575ce9f3506f8ce219b9580202b3ed9993))
+* **ui:** allow component-based settings tabs ([1245960](https://github.com/joeleliseogb/MyPuter/commit/124596058a286241b51dd87ce2fc1a68478cb5b8))
+
+
+### Bug Fixes
+
+* **backend:** remove a bad thing that really doesn't work ([8d22276](https://github.com/joeleliseogb/MyPuter/commit/8d22276f13106f7642d11da30b1500817a20ad43))
+* check subdomain earlier for /apps ([4e3a24e](https://github.com/joeleliseogb/MyPuter/commit/4e3a24e6093e279e210765e07e436f4e63b74072))
+* fix typo ([ce328b7](https://github.com/joeleliseogb/MyPuter/commit/ce328b7245ad741b64c5885f64f806fc98a55d84))
+* handle subpaths under another user ([d128cee](https://github.com/joeleliseogb/MyPuter/commit/d128ceed6f4928fa0793815feb2e2715cd273ff8))
+* incorrect error from suggested_apps ([b648817](https://github.com/joeleliseogb/MyPuter/commit/b648817f2743c2b6214ebe4177d921c9b9027594))
+* **parsely:** Make Repeat parser work when no separator is given ([9b4d16f](https://github.com/joeleliseogb/MyPuter/commit/9b4d16fbe9d5698c57f9da725a22b528a7d7cac2))
+* **phoenix:** Add missing newlines to sed command output ([e047b0b](https://github.com/joeleliseogb/MyPuter/commit/e047b0bf302284da61e677432e4cc25b531b24f2))
+* remove last component when share URL is file ([1166e69](https://github.com/joeleliseogb/MyPuter/commit/1166e69c76688d1811701c56cd4df9d38e286793))
+* remove legacy permission check in stat ([f2c6e01](https://github.com/joeleliseogb/MyPuter/commit/f2c6e01296e4214336e63bc2d69bcbf17f59890f))
+* **ui:** improve Component base class ([f8780d0](https://github.com/joeleliseogb/MyPuter/commit/f8780d032b10138851c22af53b8610c578139acc))
+
 ## 2.3.0 (2024-05-22)
 
 
