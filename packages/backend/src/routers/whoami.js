@@ -54,8 +54,14 @@ const WHOAMI_GET = eggspress('/whoami', {
         is_temp: (req.user.password === null && req.user.email === null),
         taskbar_items: await get_taskbar_items(req.user),
         referral_code: req.user.referral_code,
+        otp: !! req.user.otp_enabled,
         ...(req.new_token ? { token: req.token } : {})
     };
+
+    // Get whoami values from other services
+    const svc_whoami = req.services.get('whoami');
+    const provider_details = await svc_whoami.get_details({ user: req.user });
+    Object.assign(details, provider_details);
 
     if ( ! is_user ) {
         // When apps call /whoami they should not see these attributes
@@ -98,6 +104,8 @@ WHOAMI_POST.post('/whoami', auth, fs, express.json(), async (req, response, next
     if(req.query.return_desktop_items === 1 || req.query.return_desktop_items === '1' || req.query.return_desktop_items === 'true'){
         // by cached desktop id
         if(req.user.desktop_id){
+            // TODO: Check if used anywhere, maybe remove
+            // eslint-disable-next-line no-undef
             desktop_items = await db.read(
                 `SELECT * FROM fsentries
                 WHERE user_id = ? AND parent_uid = ?`,

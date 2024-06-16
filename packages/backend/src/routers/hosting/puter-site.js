@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
-const { AdvancedBase } = require("puter-js-common");
+const { AdvancedBase } = require("@heyputer/puter-js-common");
 const api_error_handler = require("../../api/api_error_handler");
 const config = require("../../config");
 const { get_user, get_app, id2path } = require("../../helpers");
@@ -62,7 +62,7 @@ class PuterSiteMiddleware extends AdvancedBase {
             req.subdomains[0] === 'devtest' ? 'devtest' :
             req.hostname.slice(0, -1 * (config.static_hosting_domain.length + 1));
 
-        let path = (req.baseUrl + req.path) ?? 'index.html';
+        let path = (req.baseUrl + req.path) || 'index.html';
 
         const context = Context.get();
         const services = context.get('services');

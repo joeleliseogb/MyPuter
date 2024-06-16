@@ -19,7 +19,9 @@
 const APIError = require("../../api/APIError");
 const { chkperm } = require("../../helpers");
 const { TYPE_DIRECTORY } = require("../FSNodeContext");
+const { LLListUsers } = require("../ll_operations/ll_listusers");
 const { LLReadDir } = require("../ll_operations/ll_readdir");
+const { LLReadShares } = require("../ll_operations/ll_readshares");
 const { HLFilesystemOperation } = require("./definitions");
 
 class HLReadDir extends HLFilesystemOperation {
@@ -38,9 +40,28 @@ class HLReadDir extends HLFilesystemOperation {
             }
             return [subject];
         }
+        
+        let children;
 
-        const ll_readdir = new LLReadDir();
-        const children = await ll_readdir.run(this.values);
+        this.log.noticeme('READDIR',
+            {
+            userdir: await subject.isUserDirectory(),
+            namediff: await subject.get('name') !== user.username
+            }
+        );
+        if ( subject.isRoot ) {
+            const ll_listusers = new LLListUsers();
+            children = await ll_listusers.run(this.values);
+        } else if (
+            await subject.getUserPart() !== user.username
+        ) {
+            this.log.noticeme('THIS HAPPEN');
+            const ll_readshares = new LLReadShares();
+            children = await ll_readshares.run(this.values);
+        } else {
+            const ll_readdir = new LLReadDir();
+            children = await ll_readdir.run(this.values);
+        }
 
         return Promise.all(children.map(async child => {
             // await child.fetchAll(null, user);

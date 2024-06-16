@@ -24,11 +24,11 @@ window.window_nav_history = {};
 window.window_nav_history_current_position = {};
 window.progress_tracker = [];
 window.upload_item_global_id = 0;
+window.app_instance_ids = new Set();
 
+window.menubars = [];
 window.download_progress = [];
 window.download_item_global_id = 0;
-
-window.TRUNCATE_LENGTH = 20;
 
 // This is the minimum width of the window for the sidebar to be shown
 window.window_width_threshold_for_sidebar = 500;
@@ -120,7 +120,7 @@ window.first_visit_animation = false;
 window.show_twitter_link = true;
 window.animate_window_opening = true;
 window.animate_window_closing = true;
-window.desktop_loading_fade_delay = (window.first_visit_ever && first_visit_animation ? 6000 : 1000);
+window.desktop_loading_fade_delay = (window.first_visit_ever && window.first_visit_animation ? 6000 : 1000);
 window.watchItems = [];
 window.appdata_signatures = {};
 window.appCallbackFunctions = [];

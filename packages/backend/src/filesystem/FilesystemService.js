@@ -27,7 +27,7 @@ const SystemFSEntryService = require('./storage/SystemFSEntryService.js');
 const PerformanceMonitor = require('../monitor/PerformanceMonitor.js');
 const { NodePathSelector, NodeUIDSelector, NodeInternalIDSelector } = require('./node/selectors.js');
 const FSNodeContext = require('./FSNodeContext.js');
-const { AdvancedBase } = require('puter-js-common');
+const { AdvancedBase } = require('@heyputer/puter-js-common');
 const { Context } = require('../util/context.js');
 const { simple_retry } = require('../util/retryutil.js');
 const APIError = require('../api/APIError.js');
@@ -138,7 +138,6 @@ class FilesystemService extends AdvancedBase {
                 return permission.startsWith('fs:');
             },
             checker: async (actor, permission) => {
-                debugger;
                 if ( !(actor.type instanceof UserActorType) ) {
                     return undefined;
                 }
@@ -363,7 +362,7 @@ class FilesystemService extends AdvancedBase {
             [new_path, old_path.length + 1, old_path + '%', user_id]
         );
 
-        const log = services.get('log-service').create('update_child_paths');
+        const log = this.services.get('log-service').create('update_child_paths');
         log.info(`updated ${old_path} -> ${new_path}`);
 
         monitor.end();

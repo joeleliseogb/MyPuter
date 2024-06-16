@@ -24,22 +24,15 @@ import UIItem from './UI/UIItem.js'
 import UIWindow from './UI/UIWindow.js'
 import UIWindowLogin from './UI/UIWindowLogin.js';
 import UIWindowSaveAccount from './UI/UIWindowSaveAccount.js';
-import UIWindowConfirmDownload from './UI/UIWindowConfirmDownload.js';
-import UIWindowCopyProgress from './UI/UIWindowCopyProgress.js';
-import UIWindowMoveProgress from './UI/UIWindowMoveProgress.js';
-import UIWindowNewFolderProgress from './UI/UIWindowNewFolderProgress.js';
-import UIWindowDownloadProgress from './UI/UIWindowDownloadProgress.js';
-import UIWindowUploadProgress from './UI/UIWindowUploadProgress.js';
-import UIWindowProgressEmptyTrash from './UI/UIWindowProgressEmptyTrash.js';
-import download from './helpers/download.js';
 import update_username_in_gui from './helpers/update_username_in_gui.js';
 import update_title_based_on_uploads from './helpers/update_title_based_on_uploads.js';
 import content_type_to_icon from './helpers/content_type_to_icon.js';
-import UIWindowDownloadDirProg from './UI/UIWindowDownloadDirProg.js';
+import truncate_filename from './helpers/truncate_filename.js';
 import { PROCESS_RUNNING, PortalProcess, PseudoProcess } from "./definitions.js";
+import UIWindowProgress from './UI/UIWindowProgress.js';
 
 window.is_auth = ()=>{
-    if(localStorage.getItem("auth_token") === null || auth_token === null)
+    if(localStorage.getItem("auth_token") === null || window.auth_token === null)
         return false;
     else
         return true;
@@ -47,7 +40,7 @@ window.is_auth = ()=>{
 
 window.suggest_apps_for_fsentry = async (options)=>{
     let res = await $.ajax({
-        url: api_origin + "/suggest_apps",
+        url: window.api_origin + "/suggest_apps",
         type: 'POST',
         contentType: "application/json",
         data: JSON.stringify({
@@ -55,11 +48,11 @@ window.suggest_apps_for_fsentry = async (options)=>{
             path: options.path ?? undefined,
         }),
         headers: {
-            "Authorization": "Bearer "+auth_token
+            "Authorization": "Bearer "+window.auth_token
         },
         statusCode: {
             401: function () {
-                logout();
+                window.logout();
             },
         },     
         success: function (res){
@@ -122,34 +115,6 @@ window.is_email = (email) => {
 }
 
 /**
- * A function that truncates a file name if it exceeds a certain length, while preserving the file extension. 
- * An ellipsis character '…' is added to indicate the truncation. If the original filename is short enough, 
- * it is returned unchanged.
- *
- * @param {string} input - The original filename to be potentially truncated.
- * @param {number} max_length - The maximum length for the filename. If the original filename (excluding the extension) exceeds this length, it will be truncated.
- *
- * @returns {string} The truncated filename with preserved extension if original filename is too long; otherwise, the original filename.
- *
- * @example
- *
- * let truncatedFilename = window.truncate_filename('really_long_filename.txt', 10); 
- * // truncatedFilename would be something like 'really_lo…me.txt'
- *
- */
-window.truncate_filename = (input, max_length)=>{
-    const extname = path.extname('/' + input);
-
-    if ((input.length - 15)  > max_length){
-        if(extname !== '')
-            return input.substring(0, max_length) + '…' + input.slice(-1 * (extname.length + 2));
-        else
-            return input.substring(0, max_length) + '…';
-    }
-    return input;
-};
-
-/**
  * A function that scrolls the parent element so that the child element is in view. 
  * If the child element is already in view, no scrolling occurs. 
  * The function decides the best scroll direction based on which requires the smaller adjustment.
@@ -199,7 +164,7 @@ window.scrollParentToChild = (parent, child)=>{
 
 window.getItem = async function(options){
     return $.ajax({
-        url: api_origin + "/getItem",
+        url: window.api_origin + "/getItem",
         type: 'POST',
         data: JSON.stringify({ 
             key: options.key,
@@ -208,11 +173,11 @@ window.getItem = async function(options){
         async: true,
         contentType: "application/json",
         headers: {
-            "Authorization": "Bearer "+auth_token
+            "Authorization": "Bearer "+window.auth_token
         },
         statusCode: {
             401: function () {
-                logout();
+                window.logout();
             },
         },        
         success: function (result){
@@ -224,7 +189,7 @@ window.getItem = async function(options){
 
 window.setItem = async function(options){
     return $.ajax({
-        url: api_origin + "/setItem",
+        url: window.api_origin + "/setItem",
         type: 'POST',
         data: JSON.stringify({ 
             app: options.app_uid,
@@ -234,11 +199,11 @@ window.setItem = async function(options){
         async: true,
         contentType: "application/json",
         headers: {
-            "Authorization": "Bearer "+auth_token
+            "Authorization": "Bearer "+window.auth_token
         },
         statusCode: {
             401: function () {
-                logout();
+                window.logout();
             },
         },        
         success: function (fsentry){
@@ -315,6 +280,7 @@ window.globToRegExp = function (glob, opts) {
                     reStr += ".";
                     break;
                 }
+                // fallthrough
 
             case "[":
             case "]":
@@ -322,6 +288,7 @@ window.globToRegExp = function (glob, opts) {
                     reStr += c;
                     break;
                 }
+                // fallthrough
 
             case "{":
                 if (extended) {
@@ -329,6 +296,7 @@ window.globToRegExp = function (glob, opts) {
                     reStr += "(";
                     break;
                 }
+                // fallthrough
 
             case "}":
                 if (extended) {
@@ -336,6 +304,7 @@ window.globToRegExp = function (glob, opts) {
                     reStr += ")";
                     break;
                 }
+                // fallthrough
 
             case ",":
                 if (inGroup) {
@@ -367,7 +336,7 @@ window.globToRegExp = function (glob, opts) {
 
                     if (isGlobstar) {
                         // it's a globstar, so match zero or more path segments
-                        reStr += "((?:[^/]*(?:\/|$))*)";
+                        reStr += "((?:[^/]*(?:/|$))*)";
                         i++; // move over the "/"
                     } else {
                         // it's not a globstar, so only match one path segment
@@ -411,7 +380,7 @@ window.globToRegExp = function (glob, opts) {
 window.validate_fsentry_name = function(name){
     if(!name)
         throw {message: i18n('name_cannot_be_empty')}
-    else if(!isString(name))
+    else if(!window.isString(name))
         throw {message: i18n('name_must_be_string')}
     else if(name.includes('/'))
         throw {message: i18n('name_cannot_contain_slash')}
@@ -420,7 +389,7 @@ window.validate_fsentry_name = function(name){
     else if(name === '..')
         throw {message: i18n('name_cannot_contain_double_period')};
     else if(name.length > window.max_item_name_length)
-        throw {message: i18n('name_too_long', config.max_item_name_length)}
+        throw {message: i18n('name_too_long', window.max_item_name_length)}
     else
         return true
 }
@@ -519,7 +488,7 @@ window.check_fsentry_against_allowed_file_types_string =function (fsentry, allow
             }
 
             // MIME types (e.g. text/plain)
-            else if(globToRegExp(allowed_file_type).test(fsentry.type?.toLowerCase())){
+            else if(window.globToRegExp(allowed_file_type).test(fsentry.type?.toLowerCase())){
                 passes_allowed_file_type_filter = true;
                 break;
             }
@@ -652,11 +621,11 @@ window.refresh_user_data = async (auth_token)=>{
     try{
         whoami = await puter.os.user();
     }catch(e){
-        
+        // Ignored
     }
     // update local user data
     if(whoami){
-        update_auth_data(auth_token, whoami)
+        window.update_auth_data(auth_token, whoami)
     }
 }
 
@@ -670,15 +639,21 @@ window.update_auth_data = (auth_token, user)=>{
 
     // Has email changed?
     if(window.user?.email !== user.email && user.email){
-        $('.user-email').html(user.email);
+        $('.user-email').html(html_encode(user.email));
     }
+
+    const to_storable_user = user => {
+        const storable_user = {...user};
+        delete storable_user.taskbar_items;
+        return storable_user;
+    };
 
     // update this session's user data
     window.user = user;
-    localStorage.setItem('user', JSON.stringify(window.user));
+    localStorage.setItem('user', JSON.stringify(to_storable_user(user)));
 
     // re-initialize the Puter.js objects with the new auth token
-    puter.setAuthToken(auth_token, api_origin)
+    puter.setAuthToken(auth_token, window.api_origin)
 
     //update the logged_in_users array entry for this user
     if(window.user){
@@ -698,7 +673,8 @@ window.update_auth_data = (auth_token, user)=>{
             window.logged_in_users.push(userobj);
         }
         // update local storage
-        localStorage.setItem('logged_in_users', JSON.stringify(window.logged_in_users));
+        localStorage.setItem('logged_in_users', JSON.stringify(
+            window.logged_in_users.map(to_storable_user)));
     }
 
     window.desktop_path = '/' + window.user.username + '/Desktop';
@@ -722,7 +698,7 @@ window.mutate_user_preferences = function(user_preferences_delta) {
         puter.kv.set(`user_preferences.${key}`, value);
     }
     // There may be syncing issues across multiple devices
-    update_user_preferences({ ...window.user_preferences, ...user_preferences_delta });
+    window.update_user_preferences({ ...window.user_preferences, ...user_preferences_delta });
 }
 
 window.update_user_preferences = function(user_preferences) {
@@ -740,13 +716,13 @@ window.update_user_preferences = function(user_preferences) {
 
 window.sendWindowWillCloseMsg = function(iframe_element) {
     return new Promise(function(resolve){
-        const msg_id = uuidv4();
+        const msg_id = window.uuidv4();
         iframe_element.contentWindow.postMessage({
             msg: "windowWillClose",
             msg_id: msg_id
         }, '*');
         //register callback
-        appCallbackFunctions[msg_id] = resolve;
+        window.appCallbackFunctions[msg_id] = resolve;
     })
 }
 
@@ -789,12 +765,12 @@ window.get_apps = async (app_names, callback)=>{
         return [];
 
     let res = await $.ajax({
-        url: api_origin + "/apps/"+app_names,
+        url: window.api_origin + "/apps/"+app_names,
         type: 'GET',
         async: true,
         contentType: "application/json",
         headers: {
-            "Authorization": "Bearer "+auth_token
+            "Authorization": "Bearer "+window.auth_token
         },
         success: function (res){ 
         }
@@ -861,13 +837,14 @@ window.item_icon = async (fsentry)=>{
     // --------------------------------------------------
     // If this file is Trashed then set the name to the original name of the file before it was trashed
     // --------------------------------------------------
-    if(fsentry.path?.startsWith(trash_path + '/')){
+    if(fsentry.path?.startsWith(window.trash_path + '/')){
         if(fsentry.metadata){
             try{
                 let metadata = JSON.parse(fsentry.metadata);
                 fsentry.name = (metadata && metadata.original_name) ? metadata.original_name : fsentry.name
             }
             catch(e){
+                // Ignored
             }
         }
     }
@@ -889,12 +866,12 @@ window.item_icon = async (fsentry)=>{
     // --------------------------------------------------
     // Trash
     // --------------------------------------------------
-    else if(fsentry.shortcut_to_path && fsentry.shortcut_to_path === trash_path){
+    else if(fsentry.shortcut_to_path && fsentry.shortcut_to_path === window.trash_path){
         // get trash image, this is needed to get the correct empty vs full trash icon
-        let trash_img = $(`.item[data-path="${html_encode(trash_path)}" i] .item-icon-icon`).attr('src')
+        let trash_img = $(`.item[data-path="${html_encode(window.trash_path)}" i] .item-icon-icon`).attr('src')
         // if trash_img is undefined that's probably because trash wasn't added anywhere, do a direct lookup to see if trash is empty or no
         if(!trash_img){
-            let trashstat = await puter.fs.stat(trash_path);
+            let trashstat = await puter.fs.stat(window.trash_path);
             if(trashstat.is_empty !== undefined && trashstat.is_empty === true)
                 trash_img = window.icons['trash.svg'];
             else
@@ -907,15 +884,15 @@ window.item_icon = async (fsentry)=>{
     // --------------------------------------------------
     else if(fsentry.is_dir){
         // System Directories
-        if(fsentry.path === docs_path)
+        if(fsentry.path === window.docs_path)
             return {image: window.icons['folder-documents.svg'], type: 'icon'};
-        else if (fsentry.path === pictures_path)
+        else if (fsentry.path === window.pictures_path)
             return { image: window.icons['folder-pictures.svg'], type: 'icon' };
-        else if (fsentry.path === home_path)
+        else if (fsentry.path === window.home_path)
             return { image: window.icons['folder-home.svg'], type: 'icon' };
-        else if (fsentry.path === videos_path)
+        else if (fsentry.path === window.videos_path)
             return { image: window.icons['folder-videos.svg'], type: 'icon' };
-        else if (fsentry.path === desktop_path)
+        else if (fsentry.path === window.desktop_path)
             return { image: window.icons['folder-desktop.svg'], type: 'icon' };
         // regular directories
         else
@@ -1037,11 +1014,11 @@ window.item_icon = async (fsentry)=>{
  */
 
 window.show_save_account_notice_if_needed = function(message){
-    getItem({
+    window.getItem({
         key: "save_account_notice_shown",
         success: async function(value){
             if(!value && window.user?.is_temp){
-                setItem({key: "save_account_notice_shown", value: true});
+                window.setItem({key: "save_account_notice_shown", value: true});
 
                 // Show the notice
                 setTimeout(async () => {
@@ -1071,6 +1048,7 @@ window.show_save_account_notice_if_needed = function(message){
                     })   
                     
                     if(alert_resp === 'remind-later'){
+                        // TODO
                     }
                     if(alert_resp === 'save-session'){
                         let saved = await UIWindowSaveAccount({
@@ -1088,87 +1066,12 @@ window.show_save_account_notice_if_needed = function(message){
                                 close_on_backdrop_click: false,
                             }
                         });
-                        if(!login_result)
-                            $('.toolbar').prepend(ht);
+                        // FIXME: Report login error.
                     }
-                }, desktop_loading_fade_delay + 1000);
+                }, window.desktop_loading_fade_delay + 1000);
             }
         }
     })
-}
-
-window.launch_download_from_url = async function(){
-    // get url query params
-    const url_query_params = new URLSearchParams(window.location.search);
-
-    // is this download?
-    if(url_query_params.has('download')){
-        let url = url_query_params.get('download');
-        let name = url_query_params.get('name');
-        let is_dir = url_query_params.get('is_dir');
-        let url_obj;
-
-        // if url doesn't have a protocol, add http://
-        if(!url.startsWith('http://') && !url.startsWith('https://')){
-            url = 'http://' + url;
-        }
-
-        // parse url
-        try{
-            url_obj = new URL(url);
-        }catch(e){
-            UIAlert("Invalid download URL.");
-            return;
-        }
-
-        // get hostname from url
-        let hostname = url_obj.hostname;
-
-        // name
-        if(!name)
-            name = url.split('/').pop().split('#')[0].split('?')[0];
-
-        // determine file type from url
-        let file_type = mime.getType(name);
-
-        // confirm download
-        if(await UIWindowConfirmDownload({url: url, name: name, source: hostname, type: file_type, is_dir: is_dir})){
-            // download progress tracker
-            let dl_op_id = operation_id++;
-
-            // upload progress tracker defaults
-            window.progress_tracker[dl_op_id] = [];
-            window.progress_tracker[dl_op_id][0] = {};
-            window.progress_tracker[dl_op_id][0].total = 0;
-            window.progress_tracker[dl_op_id][0].ajax_uploaded = 0;
-            window.progress_tracker[dl_op_id][0].cloud_uploaded = 0;
-
-            const progress_window = await UIWindowDownloadProgress({operation_id: dl_op_id, item_name: name});
-
-            const res = await download({
-                url: url, 
-                name: name,
-                dest_path: desktop_path, 
-                auth_token: auth_token, 
-                api_origin: api_origin,
-                dedupe_name: true,
-                overwrite: false,
-                operation_id: dl_op_id,
-                item_upload_id: 0,
-                success: function(res){
-                    $(progress_window).close();
-                },
-                error: function(err){
-                    UIAlert(err && err.message ? err.message : "Download failed.");
-                    $(progress_window).close();
-                }
-            });
-
-            // clear window URL
-            window.history.pushState(null, document.title, '/');
-        }
-        
-    }
 }
 
 window.onpopstate = (event) => {
@@ -1224,14 +1127,21 @@ window.create_folder = async(basedir, appendto_element)=>{
 	let dirname = basedir;
     let folder_name = 'New Folder';
 
-    let newfolder_op_id = operation_id++;
-    operation_cancelled[newfolder_op_id] = false;
+    let newfolder_op_id = window.operation_id++;
+    window.operation_cancelled[newfolder_op_id] = false;
     let newfolder_progress_window_init_ts = Date.now();
     let progwin;
 
     // only show progress window if it takes longer than 500ms to create folder
     let progwin_timeout = setTimeout(async () => {
-        progwin = await UIWindowNewFolderProgress({operation_id: newfolder_op_id});
+        progwin = await UIWindowProgress({
+            operation_id: newfolder_op_id,
+            // TODO: Implement cancellation.
+            // on_cancel: () => {
+            //     window.operation_cancelled[newfolder_op_id] = true;
+            // },
+        });
+        progwin.set_status(i18n('taking_longer_than_usual'));
     }, 500);
 
     // create folder
@@ -1243,10 +1153,10 @@ window.create_folder = async(basedir, appendto_element)=>{
             success: function (data){
                 const el_created_dir = $(appendto_element).find('.item[data-path="'+html_encode(dirname)+'/'+html_encode(data.name)+'"]');
                 if(el_created_dir.length > 0){
-                    activate_item_name_editor(el_created_dir);
+                    window.activate_item_name_editor(el_created_dir);
 
                     // Add action to actions_history for undo ability
-                    actions_history.push({
+                    window.actions_history.push({
                         operation: 'create_folder',
                         data: el_created_dir
                     });
@@ -1255,14 +1165,16 @@ window.create_folder = async(basedir, appendto_element)=>{
 
                 // done
                 let newfolder_duration = (Date.now() - newfolder_progress_window_init_ts);
-                if( progwin && newfolder_duration >= copy_progress_hide_delay){
-                    $(progwin).close();   
-                }else if(progwin){
-                    setTimeout(() => {
+                if (progwin) {
+                    if (newfolder_duration >= window.copy_progress_hide_delay) {
+                        progwin.close();
+                    } else {
                         setTimeout(() => {
-                            $(progwin).close();   
-                        }, Math.abs(copy_progress_hide_delay - newfolder_duration));
-                    })
+                            setTimeout(() => {
+                                progwin.close();
+                            }, Math.abs(window.copy_progress_hide_delay - newfolder_duration));
+                        });
+                    }
                 }
             }
         });
@@ -1285,10 +1197,10 @@ window.create_file = async(options)=>{
             success: async function (data){
                 const created_file = $(appendto_element).find('.item[data-path="'+html_encode(dirname)+'/'+html_encode(data.name)+'"]');
                 if(created_file.length > 0){
-                    activate_item_name_editor(created_file);
+                    window.activate_item_name_editor(created_file);
 
                     // Add action to actions_history for undo ability
-                    actions_history.push({
+                    window.actions_history.push({
                         operation: 'create_file',
                         data: created_file
                     });
@@ -1319,11 +1231,11 @@ window.create_shortcut = async(filename, is_dir, basedir, appendto_element, shor
 }
 
 window.copy_clipboard_items = async function(dest_path, dest_container_element){
-    let copy_op_id = operation_id++;
-    operation_cancelled[copy_op_id] = false;
+    let copy_op_id = window.operation_id++;
+    window.operation_cancelled[copy_op_id] = false;
     // unselect previously selected items in the target container
     $(dest_container_element).children('.item-selected').removeClass('item-selected');
-    update_explorer_footer_selected_items_count($(dest_container_element).closest('.window'));
+    window.update_explorer_footer_selected_items_count($(dest_container_element).closest('.window'));
 
     let overwrite_all = false;
     (async()=>{
@@ -1332,22 +1244,28 @@ window.copy_clipboard_items = async function(dest_path, dest_container_element){
         // only show progress window if it takes longer than 2s to copy
         let progwin;
         let progwin_timeout = setTimeout(async () => {
-            progwin = await UIWindowCopyProgress({operation_id: copy_op_id});
-        }, 2000);
+            progwin = await UIWindowProgress({
+                operation_id: copy_op_id,
+                on_cancel: () => {
+                    window.operation_cancelled[copy_op_id] = true;
+                },
+            });
+        }, 0);
 
         const copied_item_paths = []
 
-        for(let i=0; i<clipboard.length; i++){
-            let copy_path = clipboard[i].path;
+        for(let i=0; i<window.clipboard.length; i++){
+            let copy_path = window.clipboard[i].path;
             let item_with_same_name_already_exists = true;
             let overwrite = overwrite_all;
-            $(progwin).find('.copy-from').html(copy_path);
+            progwin?.set_status(i18n('copying_file', copy_path));
+
             do{
                 if(overwrite)
                     item_with_same_name_already_exists = false;
 
                 // cancelled?
-                if(operation_cancelled[copy_op_id])
+                if(window.operation_cancelled[copy_op_id])
                     return;
 
                 // perform copy
@@ -1376,8 +1294,8 @@ window.copy_clipboard_items = async function(dest_path, dest_container_element){
                             message: `<strong>${html_encode(err.entry_name)}</strong> already exists.`,
                             buttons:[
                                 {label: i18n('replace'), type: 'primary', value: 'replace'},
-                                ... (clipboard.length > 1) ? [{label: i18n('replace_all'), value: 'replace_all'}] : [],
-                                ... (clipboard.length > 1) ? [{label: i18n('skip'), value: 'skip'}] : [{label: i18n('cancel'), value: 'cancel'}],
+                                ... (window.clipboard.length > 1) ? [{label: i18n('replace_all'), value: 'replace_all'}] : [],
+                                ... (window.clipboard.length > 1) ? [{label: i18n('skip'), value: 'skip'}] : [{label: i18n('cancel'), value: 'cancel'}],
                             ]
                         })
                         if(alert_resp === 'replace'){
@@ -1401,7 +1319,7 @@ window.copy_clipboard_items = async function(dest_path, dest_container_element){
 
         // done
         // Add action to actions_history for undo ability
-        actions_history.push({
+        window.actions_history.push({
             operation: 'copy',
             data: copied_item_paths
         });
@@ -1409,14 +1327,16 @@ window.copy_clipboard_items = async function(dest_path, dest_container_element){
         clearTimeout(progwin_timeout);
 
         let copy_duration = (Date.now() - copy_progress_window_init_ts);
-        if(progwin && copy_duration >= copy_progress_hide_delay){
-            $(progwin).close();   
-        }else if(progwin){
-            setTimeout(() => {
+        if (progwin) {
+            if (copy_duration >= window.copy_progress_hide_delay) {
+                progwin.close();
+            } else {
                 setTimeout(() => {
-                    $(progwin).close();   
-                }, Math.abs(copy_progress_hide_delay - copy_duration));
-            })
+                    setTimeout(() => {
+                        progwin.close();
+                    }, Math.abs(window.copy_progress_hide_delay - copy_duration));
+                });
+            }
         }
     })();
 }
@@ -1428,7 +1348,7 @@ window.copy_clipboard_items = async function(dest_path, dest_container_element){
  * @param {string} dest_path - Destination path to copy items to
  */
 window.copy_items = function(el_items, dest_path){
-    let copy_op_id = operation_id++;
+    let copy_op_id = window.operation_id++;
     let overwrite_all = false;
     (async()=>{
         let copy_progress_window_init_ts = Date.now();
@@ -1436,7 +1356,12 @@ window.copy_items = function(el_items, dest_path){
         // only show progress window if it takes longer than 2s to copy
         let progwin;
         let progwin_timeout = setTimeout(async () => {
-            progwin = await UIWindowCopyProgress({operation_id: copy_op_id});
+            progwin = await UIWindowProgress({
+                operation_id: copy_op_id,
+                on_cancel: () => {
+                    window.operation_cancelled[copy_op_id] = true;
+                },
+            });
         }, 2000);
 
         const copied_item_paths = []
@@ -1445,13 +1370,13 @@ window.copy_items = function(el_items, dest_path){
             let copy_path = $(el_items[i]).attr('data-path');
             let item_with_same_name_already_exists = true;
             let overwrite = overwrite_all;
-            $(progwin).find('.copy-from').html(copy_path);
+            progwin?.set_status(i18n('copying_file', copy_path));
 
             do{
                 if(overwrite)
                     item_with_same_name_already_exists = false;
                 // cancelled?
-                if(operation_cancelled[copy_op_id])
+                if(window.operation_cancelled[copy_op_id])
                     return;
                 try{
                     let resp = await puter.fs.copy({
@@ -1506,7 +1431,7 @@ window.copy_items = function(el_items, dest_path){
 
         // done
         // Add action to actions_history for undo ability
-        actions_history.push({
+        window.actions_history.push({
             operation: 'copy',
             data: copied_item_paths
         });
@@ -1514,14 +1439,16 @@ window.copy_items = function(el_items, dest_path){
         clearTimeout(progwin_timeout);
 
         let copy_duration = (Date.now() - copy_progress_window_init_ts);
-        if(progwin && copy_duration >= copy_progress_hide_delay){
-            $(progwin).close();   
-        }else if(progwin){
-            setTimeout(() => {
+        if (progwin) {
+            if (copy_duration >= window.copy_progress_hide_delay) {
+                progwin.close();
+            } else {
                 setTimeout(() => {
-                    $(progwin).close();   
-                }, Math.abs(copy_progress_hide_delay - copy_duration));
-            })
+                    setTimeout(() => {
+                        progwin.close();
+                    }, Math.abs(window.copy_progress_hide_delay - copy_duration));
+                });
+            }
         }
     })()
 }
@@ -1560,8 +1487,8 @@ window.delete_item = async function(el_item, descendants_only = false){
             $(`.item[data-uid='${$(el_item).attr('data-uid')}']`).removeItems();
             // update parent windows' item counts
             $(parent_windows).each(function(index){
-                update_explorer_footer_item_count(this);
-                update_explorer_footer_selected_items_count(this);
+                window.update_explorer_footer_item_count(this);
+                window.update_explorer_footer_selected_items_count(this);
             });
             // update all shortcuts to this item
             $(`.item[data-shortcut_to_path="${html_encode($(el_item).attr('data-path'))}" i]`).attr(`data-shortcut_to_path`, '');
@@ -1574,15 +1501,15 @@ window.delete_item = async function(el_item, descendants_only = false){
 window.move_clipboard_items = function (el_target_container, target_path){
     let dest_path = target_path === undefined ? $(el_target_container).attr('data-path') : target_path;
     let el_items = [];
-    if(clipboard.length > 0){
-        for(let i=0; i<clipboard.length; i++){
-            el_items.push($(`.item[data-path="${html_encode(clipboard[i])}" i]`));
+    if(window.clipboard.length > 0){
+        for(let i=0; i<window.clipboard.length; i++){
+            el_items.push($(`.item[data-path="${html_encode(window.clipboard[i])}" i]`));
         }
         if(el_items.length > 0)
-            move_items(el_items, dest_path);
+            window.move_items(el_items, dest_path);
     }
 
-    clipboard = [];
+    window.clipboard = [];
 }
 
 /**
@@ -1606,22 +1533,35 @@ window.move_clipboard_items = function (el_target_container, target_path){
  * let filePaths = ['/path/to/file1.txt', '/path/to/file2.png'];
  * window.trigger_download(filePaths);
  */
-
 window.trigger_download = (paths)=>{
     let urls = [];
     for (let index = 0; index < paths.length; index++) {
         urls.push({
-            download: api_origin + "/down?path=" + paths[index] + "&auth_token=" + auth_token,
+            download: window.api_origin + "/down?path=" + paths[index],
             filename: path.basename(paths[index]),
         });
     }
 
-    urls.forEach(function (e) {                
-        fetch(e.download)                  
-            .then(res => res.blob())                  
-            .then(blob => {                    
-                saveAs(blob, e.filename);                
-            });            
+    urls.forEach(async function (e) {                
+        const anti_csrf = await (async () => {
+            const resp = await fetch(`${window.gui_origin}/get-anticsrf-token`);
+            const { token } = await resp.json();
+            return token;
+        })();
+        fetch(e.download, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + puter.authToken,
+            },
+            body: JSON.stringify({
+                anti_csrf,
+            }),
+        })
+            .then(res => res.blob())
+            .then(blob => {
+                saveAs(blob, e.filename);
+            });
     });
 }
 
@@ -1630,7 +1570,7 @@ window.trigger_download = (paths)=>{
  * @param {*} options 
  */
 window.launch_app = async (options)=>{
-    const uuid = options.uuid ?? uuidv4();
+    const uuid = options.uuid ?? window.uuidv4();
     let icon, title, file_signature;
     const window_options = options.window_options ?? {};
 
@@ -1639,15 +1579,13 @@ window.launch_app = async (options)=>{
     }
 
     // try to get 3rd-party app info
-    let app_info = options.app_obj ?? await get_apps(options.name);
+    let app_info = options.app_obj ?? await window.get_apps(options.name);
 
     //-----------------------------------
     // icon
     //-----------------------------------
     if(app_info.icon)
         icon = app_info.icon;
-    else if(app_info.icon)
-        icon = window.icons['app.svg'];
     else if(options.name === 'explorer')
         icon = window.icons['folder.svg'];
     else
@@ -1693,7 +1631,7 @@ window.launch_app = async (options)=>{
     //------------------------------------
     // Explorer
     //------------------------------------
-    if(options.name === 'explorer'){
+    if(options.name === 'explorer' || options.name === 'trash'){
         process = new PseudoProcess({
             uuid,
             name: 'explorer',
@@ -1711,9 +1649,10 @@ window.launch_app = async (options)=>{
         }
         else if(options.path === window.trash_path){
             title = 'Trash';
+            icon = window.icons['trash.svg'];
         }
         else if(!options.path)
-            title = root_dirname;
+            title = window.root_dirname;
         else
             title = path.dirname(options.path);
 
@@ -1758,7 +1697,7 @@ window.launch_app = async (options)=>{
             iframe_url = new URL('https://'+options.name+'.' + window.app_domain + `/index.html`);
         } else if ( app_info.index_url.startsWith(BUILTIN_PREFIX) ) {
             const name = app_info.index_url.slice(BUILTIN_PREFIX.length);
-            iframe_url = new URL(`${gui_origin}/builtin/${name}`);
+            iframe_url = new URL(`${window.gui_origin}/builtin/${name}`);
         } else {
             iframe_url = new URL(app_info.index_url);
         }
@@ -1776,7 +1715,7 @@ window.launch_app = async (options)=>{
 
         if(file_signature){
             iframe_url.searchParams.append('puter.item.uid', file_signature.uid);
-            iframe_url.searchParams.append('puter.item.path', options.file_path ? `~/` + options.file_path.split('/').slice(1).join('/') : file_signature.path);
+            iframe_url.searchParams.append('puter.item.path', privacy_aware_path(options.file_path) || file_signature.path);
             iframe_url.searchParams.append('puter.item.name', file_signature.fsentry_name);
             iframe_url.searchParams.append('puter.item.read_url', file_signature.read_url);
             iframe_url.searchParams.append('puter.item.write_url', file_signature.write_url);
@@ -1785,11 +1724,11 @@ window.launch_app = async (options)=>{
             iframe_url.searchParams.append('puter.item.accessed', file_signature.fsentry_accessed);
             iframe_url.searchParams.append('puter.item.modified', file_signature.fsentry_modified);
             iframe_url.searchParams.append('puter.item.created', file_signature.fsentry_created);
-            iframe_url.searchParams.append('puter.domain', app_domain);
+            iframe_url.searchParams.append('puter.domain', window.app_domain);
         }
         else if(options.readURL){
             iframe_url.searchParams.append('puter.item.name', options.filename);
-            iframe_url.searchParams.append('puter.item.path', options.file_path ? `~/` + options.file_path.split('/').slice(1).join('/') : undefined);
+            iframe_url.searchParams.append('puter.item.path', privacy_aware_path(options.file_path));
             iframe_url.searchParams.append('puter.item.read_url', options.readURL);
             iframe_url.searchParams.append('puter.domain', window.app_domain);
         }
@@ -1797,7 +1736,7 @@ window.launch_app = async (options)=>{
         if (app_info.godmode && app_info.godmode === 1){
             // Add auth_token to GODMODE apps
 
-            iframe_url.searchParams.append('puter.auth.token', auth_token);
+            iframe_url.searchParams.append('puter.auth.token', window.auth_token);
             iframe_url.searchParams.append('puter.auth.username', window.user.username);
             iframe_url.searchParams.append('puter.domain', window.app_domain);
         } else if (options.token){
@@ -1811,7 +1750,7 @@ window.launch_app = async (options)=>{
             let response = await fetch(window.api_origin + "/auth/get-user-app-token", {
                 "headers": {
                     "Content-Type": "application/json",
-                    "Authorization": "Bearer "+ auth_token,
+                    "Authorization": "Bearer "+ window.auth_token,
                 },
                 "body": JSON.stringify({app_uid: app_info.uid ?? app_info.uuid}),
                 "method": "POST",
@@ -1822,8 +1761,8 @@ window.launch_app = async (options)=>{
             }
         }
 
-        if(api_origin)
-            iframe_url.searchParams.append('puter.api_origin', api_origin);
+        if(window.api_origin)
+            iframe_url.searchParams.append('puter.api_origin', window.api_origin);
 
         // Add options.params to URL
         if(options.params){
@@ -1833,12 +1772,19 @@ window.launch_app = async (options)=>{
             }
         }
 
+        // Add locale to URL
+        iframe_url.searchParams.append('puter.locale', window.locale);
+
         // Add options.args to URL
         iframe_url.searchParams.append('puter.args', JSON.stringify(options.args ?? {}));
 
         // ...and finally append utm_source=puter.com to the URL
         iframe_url.searchParams.append('utm_source', 'puter.com');
 
+        // register app_instance_uid
+        window.app_instance_ids.add(uuid);
+
+        // open window
         el_win = UIWindow({
             element_uuid: uuid,
             title: title,
@@ -1867,17 +1813,17 @@ window.launch_app = async (options)=>{
         // send post request to /rao to record app open
         if(options.name !== 'explorer'){
             // add the app to the beginning of the array
-            launch_apps.recent.unshift(app_info);
+            window.launch_apps.recent.unshift(app_info);
 
             // dedupe the array by uuid, uid, and id
-            launch_apps.recent = _.uniqBy(launch_apps.recent, 'name');
+            window.launch_apps.recent = _.uniqBy(window.launch_apps.recent, 'name');
 
             // limit to window.launch_recent_apps_count
-            launch_apps.recent = launch_apps.recent.slice(0, window.launch_recent_apps_count);  
+            window.launch_apps.recent = window.launch_apps.recent.slice(0, window.launch_recent_apps_count);
 
             // send post request to /rao to record app open
             $.ajax({
-                url: api_origin + "/rao",
+                url: window.api_origin + "/rao",
                 type: 'POST',
                 data: JSON.stringify({ 
                     original_client_socket_id: window.socket?.id,
@@ -1886,7 +1832,7 @@ window.launch_app = async (options)=>{
                 async: true,
                 contentType: "application/json",
                 headers: {
-                    "Authorization": "Bearer "+auth_token
+                    "Authorization": "Bearer "+window.auth_token
                 },
             })
         }
@@ -1923,7 +1869,8 @@ window.open_item = async function(options){
     const is_shortcut = $(el_item).attr('data-is_shortcut') === '1';
     const shortcut_to_path = $(el_item).attr('data-shortcut_to_path');
     const associated_app_name = $(el_item).attr('data-associated_app_name');
-    const file_uid = $(el_item).attr('data-uid')
+    const file_uid = $(el_item).attr('data-uid');
+    
     //----------------------------------------------------------------
     // Is this a shortcut whose source is perma-deleted?
     //----------------------------------------------------------------
@@ -1933,13 +1880,13 @@ window.open_item = async function(options){
     //----------------------------------------------------------------
     // Is this a shortcut whose source is trashed?
     //----------------------------------------------------------------
-    else if(is_shortcut && shortcut_to_path.startsWith(trash_path + '/')){
+    else if(is_shortcut && shortcut_to_path.startsWith(window.trash_path + '/')){
         UIAlert(`This shortcut can't be opened because its source has been deleted.`)
     }
     //----------------------------------------------------------------
     // Is this a trashed file?
     //----------------------------------------------------------------
-    else if(item_path.startsWith(trash_path + '/')){
+    else if(item_path.startsWith(window.trash_path + '/')){
         UIAlert(`This item can't be opened because it's in the trash. To use this item, first drag it out of the Trash.`)
     }
     //----------------------------------------------------------------
@@ -1964,7 +1911,7 @@ window.open_item = async function(options){
             let res = await puter.fs.sign(window.host_app_uid ?? parent_window_app_uid, {uid: uid, action: 'write'});
             res = res.items;
             // todo split is buggy because there might be a slash in the filename
-            res.path = `~/` + item_path.split('/').slice(2).join('/');
+            res.path = privacy_aware_path(item_path);
             const parent_uuid = $el_parent_window.attr('data-parent_uuid');
             const return_to_parent_window = $el_parent_window.attr('data-return_to_parent_window') === 'true';
             if(return_to_parent_window){
@@ -2008,21 +1955,21 @@ window.open_item = async function(options){
         }
         // done
         let busy_duration = (Date.now() - busy_init_ts);
-        if( busy_duration >= busy_indicator_hide_delay){
+        if( busy_duration >= window.busy_indicator_hide_delay){
             $el_parent_window.close();   
         }else{
             setTimeout(() => {
                 // close this dialog
                 $el_parent_window.close();  
-            }, Math.abs(busy_indicator_hide_delay - busy_duration));
+            }, Math.abs(window.busy_indicator_hide_delay - busy_duration));
         }
     }
     //----------------------------------------------------------------
     // Does the user have a preference for this file type?
     //----------------------------------------------------------------
-    else if(user_preferences[`default_apps${path.extname(item_path).toLowerCase()}`]) {
-        launch_app({
-            name: user_preferences[`default_apps${path.extname(item_path).toLowerCase()}`],
+    else if(!associated_app_name && !is_dir && window.user_preferences[`default_apps${path.extname(item_path).toLowerCase()}`]) {
+        window.launch_app({
+            name: window.user_preferences[`default_apps${path.extname(item_path).toLowerCase()}`],
             file_path: item_path,
             window_title: path.basename(item_path),
             maximized: options.maximized,
@@ -2033,7 +1980,7 @@ window.open_item = async function(options){
     // Is there an app associated with this item?
     //----------------------------------------------------------------
     else if(associated_app_name !== ''){
-        launch_app({
+        window.launch_app({
             name: associated_app_name,
         })
     }
@@ -2044,7 +1991,7 @@ window.open_item = async function(options){
         UIWindow({
             path: item_path,
             title: path.basename(item_path),
-            icon: await item_icon({is_dir: true, path: item_path}),
+            icon: await window.item_icon({is_dir: true, path: item_path}),
             uid: $(el_item).attr('data-uid'),
             is_dir: is_dir,
             app: 'explorer',
@@ -2058,11 +2005,11 @@ window.open_item = async function(options){
     // Dir with an open window: change the path of the open window
     //----------------------------------------------------------------
     else if($el_parent_window.length > 0 && is_dir){
-        window_nav_history[parent_win_id] = window_nav_history[parent_win_id].slice(0, window_nav_history_current_position[parent_win_id]+1);
-        window_nav_history[parent_win_id].push(item_path);
-        window_nav_history_current_position[parent_win_id]++;
+        window.window_nav_history[parent_win_id] = window.window_nav_history[parent_win_id].slice(0, window.window_nav_history_current_position[parent_win_id]+1);
+        window.window_nav_history[parent_win_id].push(item_path);
+        window.window_nav_history_current_position[parent_win_id]++;
 
-        update_window_path($el_parent_window, item_path);
+        window.update_window_path($el_parent_window, item_path);
     }
     //----------------------------------------------------------------
     // all other cases: try to open using an app
@@ -2075,7 +2022,7 @@ window.open_item = async function(options){
         // get all info needed to open an item
         try{
             open_item_meta = await $.ajax({
-                url: api_origin + "/open_item",
+                url: window.api_origin + "/open_item",
                 type: 'POST',
                 contentType: "application/json",
                 data: JSON.stringify({
@@ -2083,19 +2030,20 @@ window.open_item = async function(options){
                     path: fspath ?? undefined,
                 }),
                 headers: {
-                    "Authorization": "Bearer "+auth_token
+                    "Authorization": "Bearer "+window.auth_token
                 },
                 statusCode: {
                     401: function () {
-                        logout();
+                        window.logout();
                     },
                 },
             });
         }catch(err){
+            // Ignored
         }
 
         // get a list of suggested apps for this file type.
-        let suggested_apps = open_item_meta?.suggested_apps ?? await suggest_apps_for_fsentry({uid: fsuid, path: fspath});
+        let suggested_apps = open_item_meta?.suggested_apps ?? await window.suggest_apps_for_fsentry({uid: fsuid, path: fspath});
         
         //---------------------------------------------
         // No suitable apps, ask if user would like to
@@ -2106,7 +2054,7 @@ window.open_item = async function(options){
             // If .zip file, unzip it
             //---------------------------------------------
             if(path.extname(item_path) === '.zip'){
-                unzipItem(item_path);
+                window.unzipItem(item_path);
                 return;
             }
             const alert_resp = await UIAlert(
@@ -2123,7 +2071,7 @@ window.open_item = async function(options){
                     }
                 ])
             if(alert_resp === 'download_file'){
-                trigger_download([item_path]);
+                window.trigger_download([item_path]);
             }
             return;
         }
@@ -2131,7 +2079,7 @@ window.open_item = async function(options){
         // First suggested app is default app to open this item
         //---------------------------------------------
         else{
-            launch_app({ 
+            window.launch_app({
                 name: suggested_apps[0].name, 
                 token: open_item_meta.token,
                 file_path: item_path,
@@ -2153,8 +2101,8 @@ window.open_item = async function(options){
  * @returns {Promise<void>} 
  */
 window.move_items = async function(el_items, dest_path, is_undo = false){
-    let move_op_id = operation_id++;
-    operation_cancelled[move_op_id] = false;
+    let move_op_id = window.operation_id++;
+    window.operation_cancelled[move_op_id] = false;
 
     // --------------------------------------------------------
     // Optimization: in case all items being moved 
@@ -2183,7 +2131,12 @@ window.move_items = async function(el_items, dest_path, is_undo = false){
     // only show progress window if it takes longer than 2s to move
     let progwin;
     let progwin_timeout = setTimeout(async () => {
-        progwin = await UIWindowMoveProgress({operation_id: move_op_id});
+        progwin = await UIWindowProgress({
+            operation_id: move_op_id,
+            on_cancel: () => {
+                window.operation_cancelled[move_op_id] = true;
+            },
+        });
     }, 2000);
 
     // storing moved items for undo ability
@@ -2195,7 +2148,7 @@ window.move_items = async function(el_items, dest_path, is_undo = false){
         let el_item = el_items[i];
 
         // if operation cancelled by user, stop
-        if(operation_cancelled[move_op_id])
+        if(window.operation_cancelled[move_op_id])
             return;
 
         // cannot move an immutable item, skip it
@@ -2233,22 +2186,25 @@ window.move_items = async function(el_items, dest_path, is_undo = false){
                     try{
                         metadata = JSON.parse(metadata)
                     }catch(e){
+                        // Ignored
                     }
                 }
 
                 let new_name;
 
                 // user cancelled?
-                if(operation_cancelled[move_op_id])
+                if(window.operation_cancelled[move_op_id])
                     return;
 
                 // indicates whether this is a recycling operation
                 let recycling = false;
 
+                let status_i18n_string = 'moving_file';
+
                 // --------------------------------------------------------
                 // Trashing
                 // --------------------------------------------------------
-                if(dest_path === trash_path){
+                if(dest_path === window.trash_path){
                     new_name = $(el_item).attr('data-uid');
                     metadata = {
                         original_name: $(el_item).attr('data-name'),
@@ -2256,19 +2212,21 @@ window.move_items = async function(el_items, dest_path, is_undo = false){
                         trashed_ts: Math.round(Date.now() / 1000),
                     };
 
+                    status_i18n_string = 'deleting_file';
+
                     // update other clients
                     if(window.socket)
                         window.socket.emit('trash.is_empty', {is_empty: false});
 
                     // change trash icons to 'trash-full.svg'
                     $(`[data-app="trash"]`).find('.taskbar-icon > img').attr('src', window.icons['trash-full.svg']);
-                    $(`.item[data-path="${html_encode(trash_path)}" i], .item[data-shortcut_to_path="${html_encode(trash_path)}" i]`).find('.item-icon > img').attr('src', window.icons['trash-full.svg']);
-                    $(`.window[data-path="${html_encode(trash_path)}" i]`).find('.window-head-icon').attr('src', window.icons['trash-full.svg']);
+                    $(`.item[data-path="${html_encode(window.trash_path)}" i], .item[data-shortcut_to_path="${html_encode(window.trash_path)}" i]`).find('.item-icon > img').attr('src', window.icons['trash-full.svg']);
+                    $(`.window[data-path="${html_encode(window.trash_path)}" i]`).find('.window-head-icon').attr('src', window.icons['trash-full.svg']);
                 }
 
                 // moving an item into a trashed directory? deny.
-                else if(dest_path.startsWith(trash_path)){
-                    $(progwin).close();
+                else if(dest_path.startsWith(window.trash_path)){
+                    progwin?.close();
                     UIAlert('Cannot move items into a deleted folder.');
                     return;
                 }
@@ -2281,13 +2239,13 @@ window.move_items = async function(el_items, dest_path, is_undo = false){
                     new_name = metadata.original_name;
                     metadata = {};
                     untrashed_at_least_one_item = true;
-                    path_to_show_on_progwin = trash_path + '/' + new_name;
+                    path_to_show_on_progwin = window.trash_path + '/' + new_name;
                 }
 
                 // --------------------------------------------------------
                 // update progress window with current item being moved
                 // --------------------------------------------------------
-                $(progwin).find('.move-from').html(path_to_show_on_progwin);
+                progwin?.set_status(i18n(status_i18n_string, path_to_show_on_progwin));
 
                 // execute move
                 let resp = await puter.fs.move({
@@ -2320,13 +2278,13 @@ window.move_items = async function(el_items, dest_path, is_undo = false){
                     $(this).removeItems();
                     // update parent windows' item counts and selected item counts in their footers
                     $(parent_windows).each(function(){
-                        update_explorer_footer_item_count(this);
-                        update_explorer_footer_selected_items_count(this)
+                        window.update_explorer_footer_item_count(this);
+                        window.update_explorer_footer_selected_items_count(this)
                     });
                 })
 
                 // if trashing, close windows of trashed items and its descendants
-                if(dest_path === trash_path){
+                if(dest_path === window.trash_path){
                     $(`.window[data-path="${html_encode($(el_item).attr('data-path'))}" i]`).close();
                     // todo this has to be case-insensitive but the `i` selector doesn't work on ^=
                     $(`.window[data-path^="${html_encode($(el_item).attr('data-path'))}/"]`).close();
@@ -2336,16 +2294,17 @@ window.move_items = async function(el_items, dest_path, is_undo = false){
                 else{
                     // todo this has to be case-insensitive but the `i` selector doesn't work on ^=
                     $(`.window[data-path^="${html_encode($(el_item).attr('data-path'))}/"], .window[data-path="${html_encode($(el_item).attr('data-path'))}" i]`).each(function(){
-                        update_window_path(this, $(this).attr('data-path').replace($(el_item).attr('data-path'), path.join(dest_path, fsentry.name)));
+                        window.update_window_path(this, $(this).attr('data-path').replace($(el_item).attr('data-path'), path.join(dest_path, fsentry.name)));
                     })
                 }
 
-                if(dest_path === trash_path){
+                if(dest_path === window.trash_path){
                     // if trashing dir... 
                     if($(el_item).attr('data-is_dir') === '1'){
                         // disassociate all its websites
                         // todo, some client-side check to see if this dir has at least one associated website before sending ajax request
-                        puter.hosting.delete(dir_uuid)
+                        // FIXME: dir_uuid is not defined, is this the same as the data-uid attribute?
+                        // puter.hosting.delete(dir_uuid)
 
                         $(`.mywebsites-dir-path[data-uuid="${$(el_item).attr('data-uid')}"]`).remove();
                         // remove the website badge from all instances of the dir
@@ -2368,14 +2327,14 @@ window.move_items = async function(el_items, dest_path, is_undo = false){
                     associated_app_name: fsentry.associated_app?.name,
                     uid: fsentry.uid,
                     path: fsentry.path,
-                    icon: await item_icon(fsentry),
-                    name: (dest_path === trash_path) ? $(el_item).attr('data-name') : fsentry.name,
+                    icon: await window.item_icon(fsentry),
+                    name: (dest_path === window.trash_path) ? $(el_item).attr('data-name') : fsentry.name,
                     is_dir: fsentry.is_dir,
                     size: fsentry.size,
                     type: fsentry.type,
                     modified: fsentry.modified,
                     is_selected: false,
-                    is_shared: (dest_path === trash_path) ? false : fsentry.is_shared,
+                    is_shared: (dest_path === window.trash_path) ? false : fsentry.is_shared,
                     is_shortcut: fsentry.is_shortcut,
                     shortcut_to: fsentry.shortcut_to,
                     shortcut_to_path: fsentry.shortcut_to_path,
@@ -2397,7 +2356,7 @@ window.move_items = async function(el_items, dest_path, is_undo = false){
                             immutable: false,
                             uid: dir.uid,
                             path: dir.path,
-                            icon: await item_icon(dir),
+                            icon: await window.item_icon(dir),
                             name: dir.name,
                             size: dir.size,
                             type: dir.type,
@@ -2409,12 +2368,12 @@ window.move_items = async function(el_items, dest_path, is_undo = false){
                             suggested_apps: dir.suggested_apps,
                         });
                     }
-                    sort_items(item_container);
+                    window.sort_items(item_container);
                 }); 
 
                 //sort each container
                 $(`.item-container[data-path="${html_encode(dest_path)}" i]`).each(function(){
-                    sort_items(this, $(this).attr('data-sort_by'), $(this).attr('data-sort_order'))
+                    window.sort_items(this, $(this).attr('data-sort_by'), $(this).attr('data-sort_order'))
                 })
             }catch(err){
                 // -----------------------------------------------------------------------
@@ -2457,14 +2416,14 @@ window.move_items = async function(el_items, dest_path, is_undo = false){
 
         // check if trash is empty
         if(untrashed_at_least_one_item){
-            const trash = await puter.fs.stat(trash_path);
+            const trash = await puter.fs.stat(window.trash_path);
             if(window.socket){
                 window.socket.emit('trash.is_empty', {is_empty: trash.is_empty});
             }
             if(trash.is_empty){
                 $(`[data-app="trash"]`).find('.taskbar-icon > img').attr('src', window.icons['trash.svg']);
-                $(`.item[data-path="${html_encode(trash_path)}" i]`).find('.item-icon > img').attr('src', window.icons['trash.svg']);
-                $(`.window[data-path="${html_encode(trash_path)}" i]`).find('.window-head-icon').attr('src', window.icons['trash.svg']);
+                $(`.item[data-path="${html_encode(window.trash_path)}" i]`).find('.item-icon > img').attr('src', window.icons['trash.svg']);
+                $(`.window[data-path="${html_encode(window.trash_path)}" i]`).find('.window-head-icon').attr('src', window.icons['trash.svg']);
             }
         }
     }
@@ -2479,13 +2438,13 @@ window.move_items = async function(el_items, dest_path, is_undo = false){
     // DONE! close progress window with delay to allow user to see 100% progress
     // -----------------------------------------------------------------------
     // Add action to actions_history for undo ability
-    if(!is_undo && dest_path !== trash_path){
-        actions_history.push({
+    if(!is_undo && dest_path !== window.trash_path){
+        window.actions_history.push({
             operation: 'move',
             data: moved_items,
         });
-    }else if(!is_undo && dest_path === trash_path){
-        actions_history.push({
+    }else if(!is_undo && dest_path === window.trash_path){
+        window.actions_history.push({
             operation: 'delete',
             data: moved_items,
         });
@@ -2493,148 +2452,9 @@ window.move_items = async function(el_items, dest_path, is_undo = false){
 
     if(progwin){
         setTimeout(() => {
-            $(progwin).close();   
-        }, copy_progress_hide_delay);
+            progwin.close();
+        }, window.copy_progress_hide_delay);
     }
-}
-
-/**
- * Generates sharing URLs for various social media platforms and services based on the provided arguments.
- *
- * @global
- * @function
- * @param {Object} args - Configuration object for generating share URLs.
- * @param {string} [args.url] - The URL to share.
- * @param {string} [args.title] - The title or headline of the content to share.
- * @param {string} [args.image] - Image URL associated with the content.
- * @param {string} [args.desc] - A description of the content.
- * @param {string} [args.appid] - App ID for certain platforms that require it.
- * @param {string} [args.redirecturl] - Redirect URL for certain platforms.
- * @param {string} [args.via] - Attribution source, e.g., a Twitter username.
- * @param {string} [args.hashtags] - Comma-separated list of hashtags without '#'.
- * @param {string} [args.provider] - Content provider.
- * @param {string} [args.language] - Content's language.
- * @param {string} [args.userid] - User ID for certain platforms.
- * @param {string} [args.category] - Content's category.
- * @param {string} [args.phonenumber] - Phone number for platforms like SMS or Telegram.
- * @param {string} [args.emailaddress] - Email address to share content to.
- * @param {string} [args.ccemailaddress] - CC email address for sharing content.
- * @param {string} [args.bccemailaddress] - BCC email address for sharing content.
- * @returns {Object} - An object containing key-value pairs where keys are platform names and values are constructed sharing URLs.
- * 
- * @example
- * const shareConfig = {
- *     url: 'https://example.com',
- *     title: 'Check this out!',
- *     desc: 'This is an amazing article on example.com',
- *     via: 'exampleUser'
- * };
- * const shareLinks = window.socialLink(shareConfig);
- * console.log(shareLinks.twitter);  // Outputs the constructed Twitter share link
- */
-window.socialLink = function (args) {
-    const validargs = [
-        'url',
-        'title',
-        'image',
-        'desc',
-        'appid',
-        'redirecturl',
-        'via',
-        'hashtags',
-        'provider',
-        'language',
-        'userid',
-        'category',
-        'phonenumber',
-        'emailaddress',
-        'cemailaddress',
-        'bccemailaddress',
-    ];
-    
-    for(var i = 0; i < validargs.length; i++) {
-        const validarg = validargs[i];
-        if(!args[validarg]) {
-            args[validarg] = '';
-        }
-    }
-    
-    const url = fixedEncodeURIComponent(args.url);
-    const title = fixedEncodeURIComponent(args.title);
-    const image = fixedEncodeURIComponent(args.image);
-    const desc = fixedEncodeURIComponent(args.desc);
-    const via = fixedEncodeURIComponent(args.via);
-    const hash_tags = fixedEncodeURIComponent(args.hashtags);
-    const language = fixedEncodeURIComponent(args.language);
-    const user_id = fixedEncodeURIComponent(args.userid);
-    const category = fixedEncodeURIComponent(args.category);
-    const phone_number = fixedEncodeURIComponent(args.phonenumber);
-    const email_address = fixedEncodeURIComponent(args.emailaddress);
-    const cc_email_address = fixedEncodeURIComponent(args.ccemailaddress);
-    const bcc_email_address = fixedEncodeURIComponent(args.bccemailaddress);
-    
-    var text = title;
-    
-    if(desc) {
-        text += '%20%3A%20';	// This is just this, " : "
-        text += desc;
-    }
-    
-    return {
-        'add.this':'http://www.addthis.com/bookmark.php?url=' + url,
-        'blogger':'https://www.blogger.com/blog-this.g?u=' + url + '&n=' + title + '&t=' + desc,
-        'buffer':'https://buffer.com/add?text=' + text + '&url=' + url,
-        'diaspora':'https://share.diasporafoundation.org/?title=' + title + '&url=' + url,
-        'douban':'http://www.douban.com/recommend/?url=' + url + '&title=' + text,
-        'email':'mailto:' + email_address + '?subject=' + title + '&body=' + desc,
-        'evernote':'https://www.evernote.com/clip.action?url=' + url + '&title=' + text,
-        'getpocket':'https://getpocket.com/edit?url=' + url,
-        'facebook':'http://www.facebook.com/sharer.php?u=' + url,
-        'flattr':'https://flattr.com/submit/auto?user_id=' + user_id + '&url=' + url + '&title=' + title + '&description=' + text + '&language=' + language + '&tags=' + hash_tags + '&hidden=HIDDEN&category=' + category,
-        'flipboard':'https://share.flipboard.com/bookmarklet/popout?v=2&title=' + text + '&url=' + url, 
-        'gmail':'https://mail.google.com/mail/?view=cm&to=' + email_address + '&su=' + title + '&body=' + url + '&bcc=' + bcc_email_address + '&cc=' + cc_email_address,
-        'google.bookmarks':'https://www.google.com/bookmarks/mark?op=edit&bkmk=' + url + '&title=' + title + '&annotation=' + text + '&labels=' + hash_tags + '',
-        'instapaper':'http://www.instapaper.com/edit?url=' + url + '&title=' + title + '&description=' + desc,
-        'line.me':'https://lineit.line.me/share/ui?url=' + url + '&text=' + text,
-        'linkedin':'https://www.linkedin.com/sharing/share-offsite/?url=' + url,
-        'livejournal':'http://www.livejournal.com/update.bml?subject=' + text + '&event=' + url,
-        'hacker.news':'https://news.ycombinator.com/submitlink?u=' + url + '&t=' + title,
-        'ok.ru':'https://connect.ok.ru/dk?st.cmd=WidgetSharePreview&st.shareUrl=' + url,
-        'pinterest':'http://pinterest.com/pin/create/button/?url=' + url ,
-        'qzone':'http://sns.qzone.qq.com/cgi-bin/qzshare/cgi_qzshare_onekey?url=' + url,
-        'reddit':'https://reddit.com/submit?url=' + url + '&title=' + title,
-        'renren':'http://widget.renren.com/dialog/share?resourceUrl=' + url + '&srcUrl=' + url + '&title=' + text + '&description=' + desc,
-        'skype':'https://web.skype.com/share?url=' + url + '&text=' + text,
-        'sms':'sms:' + phone_number + '?body=' + text,
-        'surfingbird.ru':'http://surfingbird.ru/share?url=' + url + '&description=' + desc + '&screenshot=' + image + '&title=' + title,
-        'telegram.me':'https://t.me/share/url?url=' + url + '&text=' + text + '&to=' + phone_number,
-        'threema':'threema://compose?text=' + text + '&id=' + user_id,
-        'tumblr':'https://www.tumblr.com/widgets/share/tool?canonicalUrl=' + url + '&title=' + title + '&caption=' + desc + '&tags=' + hash_tags,
-        'twitter':'https://twitter.com/intent/tweet?url=' + url + '&text=' + text + '&via=' + via + '&hashtags=' + hash_tags,
-        'vk':'http://vk.com/share.php?url=' + url + '&title=' + title + '&comment=' + desc,
-        'weibo':'http://service.weibo.com/share/share.php?url=' + url + '&appkey=&title=' + title + '&pic=&ralateUid=',
-        'whatsapp':'https://api.whatsapp.com/send?text=' + text + '%20' + url,
-        'xing':'https://www.xing.com/spi/shares/new?url=' + url,
-        'yahoo':'http://compose.mail.yahoo.com/?to=' + email_address + '&subject=' + title + '&body=' + text,
-    };
-}
-
-/**
- * Encodes a URI component with enhanced safety by replacing characters 
- * that are not typically encoded by the standard encodeURIComponent.
- *
- * @param {string} str - The string to be URI encoded.
- * @returns {string} - Returns the URI encoded string.
- *
- * @example
- * const str = "Hello, world!";
- * const encodedStr = fixedEncodeURIComponent(str);
- * console.log(encodedStr);  // Expected output: "Hello%2C%20world%21"
- */
-function fixedEncodeURIComponent(str) {
-    return encodeURIComponent(str).replace(/[!'()*]/g, function(c) {
-        return '%' + c.charCodeAt(0).toString(16);
-    });
 }
 
 /**
@@ -2660,7 +2480,7 @@ window.refresh_desktop_background = function(){
     }
     // default background
     else{
-        let wallpaper = (window.gui_env === 'prod') ? '/dist/images/wallpaper.webp' :  '/images/wallpaper.webp';
+        let wallpaper = (window.gui_env === 'prod') ? '/dist/images/wallpaper.webp' :  '/src/images/wallpaper.webp';
         window.set_desktop_background({
             url: wallpaper,
             fit: 'cover',
@@ -2707,7 +2527,7 @@ window.init_upload_using_dialog = function(el_target_container, target_path = nu
             const files = $('#upload-file-dialog')[0].files;
             if(files.length > 0){
                 try{
-                    upload_items(files, target_path);
+                    window.upload_items(files, target_path);
                 }
                 catch(err){
                     UIAlert(err.message ?? err)
@@ -2725,7 +2545,7 @@ window.upload_items = async function(items, dest_path){
     let upload_progress_window;
     let opid;
 
-    if(dest_path == trash_path){
+    if(dest_path == window.trash_path){
         UIAlert('Uploading to trash is not allowed!');
         return;
     }
@@ -2741,27 +2561,30 @@ window.upload_items = async function(items, dest_path){
             init: async(operation_id, xhr)=>{
                 opid = operation_id;
                 // create upload progress window
-                upload_progress_window = await UIWindowUploadProgress({operation_id: operation_id});
-                // cancel btn
-                $(upload_progress_window).find('.upload-cancel-btn').on('click', function(e){
-                    $(upload_progress_window).close();
-                    show_save_account_notice_if_needed();
-                    xhr.abort();
-                })
+                upload_progress_window = await UIWindowProgress({
+                    title: i18n('upload'),
+                    icon: window.icons[`app-icon-uploader.svg`],
+                    operation_id: operation_id,
+                    show_progress: true,
+                    on_cancel: () => {
+                        window.show_save_account_notice_if_needed();
+                        xhr.abort();
+                    },
+                });
                 // add to active_uploads
-                active_uploads[opid] = 0;
+                window.active_uploads[opid] = 0;
             },
             // start
             start: async function(){
                 // change upload progress window message to uploading
-                $(upload_progress_window).find('.upload-progress-msg').html(`Uploading (<span class="upload-progress-percent">0%</span>)`);
+                upload_progress_window.set_status('Uploading');
+                upload_progress_window.set_progress(0);
             },
             // progress
             progress: async function(operation_id, op_progress){
-                $(`[data-upload-operation-id="${operation_id}"]`).find('.upload-progress-bar').css( 'width', op_progress+'%');
-                $(`[data-upload-operation-id="${operation_id}"]`).find('.upload-progress-percent').html(op_progress+'%');
+                upload_progress_window.set_progress(op_progress);
                 // update active_uploads
-                active_uploads[opid] = op_progress;
+                window.active_uploads[opid] = op_progress;
                 // update title if window is not visible
                 if(document.visibilityState !== "visible"){
                     update_title_based_on_uploads();
@@ -2780,32 +2603,31 @@ window.upload_items = async function(items, dest_path){
                     files.push(items.path)
                 }
 
-                actions_history.push({
+                window.actions_history.push({
                     operation: 'upload',
                     data: files
                 });
                 // close progress window after a bit of delay for a better UX
                 setTimeout(() => {
                     setTimeout(() => {
-                        $(upload_progress_window).close();  
-                        show_save_account_notice_if_needed();
-                    }, Math.abs(upload_progress_hide_delay));
+                        upload_progress_window.close();
+                        window.show_save_account_notice_if_needed();
+                    }, Math.abs(window.upload_progress_hide_delay));
                 })
                 // remove from active_uploads
-                delete active_uploads[opid];
+                delete window.active_uploads[opid];
             },
             // error
             error: async function(err){
-                $(upload_progress_window).close();  
-                // UIAlert(err?.message ?? 'An error occurred while uploading.');
+                upload_progress_window.show_error(i18n('error_uploading_files'), err.message);
                 // remove from active_uploads
-                delete active_uploads[opid];
+                delete window.active_uploads[opid];
             },
             // abort
             abort: async function(operation_id){
                 // console.log('upload aborted');
                 // remove from active_uploads
-                delete active_uploads[opid];
+                delete window.active_uploads[opid];
             }
         }
     );
@@ -2832,13 +2654,14 @@ window.empty_trash = async function(){
     // only show progress window if it takes longer than 500ms to create folder
     let init_ts = Date.now();
     let progwin;
-    let op_id = uuidv4();
+    let op_id = window.uuidv4();
     let progwin_timeout = setTimeout(async () => {
-        progwin = await UIWindowProgressEmptyTrash({operation_id: op_id});
+        progwin = await UIWindowProgress({operation_id: op_id});
+        progwin.set_status(i18n('emptying_trash'));
     }, 500);
 
     await puter.fs.delete({
-        paths: trash_path,
+        paths: window.trash_path,
         descendantsOnly: true,
         recursive: true,
         success: async function (resp){
@@ -2848,24 +2671,24 @@ window.empty_trash = async function(){
             }
             // use the 'empty trash' icon for Trash
             $(`[data-app="trash"]`).find('.taskbar-icon > img').attr('src', window.icons['trash.svg']);
-            $(`.item[data-path="${html_encode(trash_path)}" i], .item[data-shortcut_to_path="${html_encode(trash_path)}" i]`).find('.item-icon > img').attr('src', window.icons['trash.svg']); 
-            $(`.window[data-path="${trash_path}"]`).find('.window-head-icon').attr('src', window.icons['trash.svg']);
+            $(`.item[data-path="${html_encode(window.trash_path)}" i], .item[data-shortcut_to_path="${html_encode(window.trash_path)}" i]`).find('.item-icon > img').attr('src', window.icons['trash.svg']);
+            $(`.window[data-path="${window.trash_path}"]`).find('.window-head-icon').attr('src', window.icons['trash.svg']);
             // remove all items with trash paths
             // todo this has to be case-insensitive but the `i` selector doesn't work on ^=
-            $(`.item[data-path^="${trash_path}/"]`).removeItems();
+            $(`.item[data-path^="${window.trash_path}/"]`).removeItems();
             // update the footer item count for Trash
-            update_explorer_footer_item_count($(`.window[data-path="${trash_path}"]`))
+            window. update_explorer_footer_item_count($(`.window[data-path="${window.trash_path}"]`))
             // close progress window
             clearTimeout(progwin_timeout);
             setTimeout(() => {
-                $(progwin).close();   
-            }, Math.max(0, copy_progress_hide_delay - (Date.now() - init_ts)));
+                progwin?.close();
+            }, Math.max(0, window.copy_progress_hide_delay - (Date.now() - init_ts)));
         },
         error: async function (err){
             clearTimeout(progwin_timeout);
             setTimeout(() => {
-                $(progwin).close();   
-            }, Math.max(0, copy_progress_hide_delay - (Date.now() - init_ts)));
+                progwin?.close();
+            }, Math.max(0, window.copy_progress_hide_delay - (Date.now() - init_ts)));
         }
     });
 }
@@ -2881,10 +2704,10 @@ window.copy_to_clipboard = async function(text){
 }
 
 window.getUsage = () => {
-    return fetch(api_origin + "/drivers/usage", {
+    return fetch(window.api_origin + "/drivers/usage", {
         headers: {
             "Content-Type": "application/json",
-            "Authorization": "Bearer " + auth_token
+            "Authorization": "Bearer " + window.auth_token
         },
         method: "GET"
     })
@@ -2987,14 +2810,14 @@ window.zipItems = async function(el_items, targetDirPath, download = true) {
     let progwin, progwin_timeout;
     // only show progress window if it takes longer than 500ms to download
     progwin_timeout = setTimeout(async () => {
-        progwin = await UIWindowDownloadDirProg();
+        progwin = await UIWindowProgress();
     }, 500);
 
     for (const el_item of el_items) {
         let targetPath = $(el_item).attr('data-path');
         // if directory, zip the directory
         if($(el_item).attr('data-is_dir') === '1'){
-            $(progwin).find('.dir-dl-status').html(`Reading <strong>${html_encode(targetPath)}</strong>`);
+            progwin?.set_status(i18n('reading_file', targetPath));
             // Recursively read the directory
             let children = await readDirectoryRecursive(targetPath);
 
@@ -3007,7 +2830,7 @@ window.zipItems = async function(el_items, targetDirPath, download = true) {
                     relativePath = path.basename(targetPath) + '/' + child.relativePath;
 
                 // update progress window
-                $(progwin).find('.dir-dl-status').html(`Zipping <strong>${html_encode(relativePath)}</strong>`);
+                progwin?.set_status(i18n('zipping_file', relativePath));
                 
                 // read file content
                 let content = await puter.fs.read(child.path);
@@ -3056,17 +2879,18 @@ window.zipItems = async function(el_items, targetDirPath, download = true) {
             // close progress window
             clearTimeout(progwin_timeout);
             setTimeout(() => {
-                $(progwin).close();   
-            }, Math.max(0, copy_progress_hide_delay - (Date.now() - start_ts)));
+                progwin?.close();
+            }, Math.max(0, window.copy_progress_hide_delay - (Date.now() - start_ts)));
         })
         .catch(function (err) {
             // close progress window
             clearTimeout(progwin_timeout);
             setTimeout(() => {
-                $(progwin).close();   
-            }, Math.max(0, copy_progress_hide_delay - (Date.now() - start_ts)));
+                progwin?.close();
+            }, Math.max(0, window.copy_progress_hide_delay - (Date.now() - start_ts)));
 
             // handle errors
+            // TODO: Display in progress dialog
             console.error("Error in zipping files: ", err);
         });
 }
@@ -3109,7 +2933,7 @@ window.unzipItem = async function(itemPath) {
     let progwin, progwin_timeout;
     // only show progress window if it takes longer than 500ms to download
     progwin_timeout = setTimeout(async () => {
-        progwin = await UIWindowDownloadDirProg();
+        progwin = await UIWindowProgress();
     }, 500);
 
     const zip = new JSZip();
@@ -3131,16 +2955,16 @@ window.unzipItem = async function(itemPath) {
         // close progress window
         clearTimeout(progwin_timeout);
         setTimeout(() => {
-            $(progwin).close();   
-        }, Math.max(0, copy_progress_hide_delay - (Date.now() - start_ts)));
+            progwin?.close();
+        }, Math.max(0, window.copy_progress_hide_delay - (Date.now() - start_ts)));
 
     }).catch(function (e) {
         // UIAlert(e.message);
         // close progress window
         clearTimeout(progwin_timeout);
         setTimeout(() => {
-            $(progwin).close();   
-        }, Math.max(0, copy_progress_hide_delay - (Date.now() - start_ts)));
+            progwin?.close();
+        }, Math.max(0, window.copy_progress_hide_delay - (Date.now() - start_ts)));
     })
 }
 
@@ -3152,7 +2976,7 @@ window.rename_file = async(options, new_name, old_name, old_path, el_item, el_it
         success: async (fsentry)=>{
             // Add action to actions_history for undo ability
             if (!is_undo)
-                actions_history.push({
+                window.actions_history.push({
                     operation: 'rename',
                     data: {options, new_name, old_name, old_path, el_item, el_item_name, el_item_icon, el_item_name_editor, website_url}
                 });
@@ -3161,7 +2985,7 @@ window.rename_file = async(options, new_name, old_name, old_path, el_item, el_it
             const old_extension = path.extname(old_name); 
             const new_extension = path.extname(new_name);
             if(old_extension !== new_extension){
-                suggest_apps_for_fsentry({
+                window.suggest_apps_for_fsentry({
                     uid: options.uid,
                     onSuccess: function(suggested_apps){
                         options.suggested_apps = suggested_apps;
@@ -3170,31 +2994,31 @@ window.rename_file = async(options, new_name, old_name, old_path, el_item, el_it
             }
 
             // Set new item name
-            $(`.item[data-uid='${$(el_item).attr('data-uid')}'] .item-name`).html(html_encode(truncate_filename(new_name, TRUNCATE_LENGTH)).replaceAll(' ', '&nbsp;'));
+            $(`.item[data-uid='${$(el_item).attr('data-uid')}'] .item-name`).html(html_encode(truncate_filename(new_name)).replaceAll(' ', '&nbsp;'));
             $(el_item_name).show();
 
             // Hide item name editor
             $(el_item_name_editor).hide();
 
             // Set new icon
-            const new_icon = (options.is_dir ? window.icons['folder.svg'] : (await item_icon(fsentry)).image);
+            const new_icon = (options.is_dir ? window.icons['folder.svg'] : (await window.item_icon(fsentry)).image);
             $(el_item_icon).find('.item-icon-icon').attr('src', new_icon);
 
-            // Set new data-name
+            // Set new `data-name`
             options.name = new_name;
             $(el_item).attr('data-name', html_encode(new_name));
             $(`.item[data-uid='${$(el_item).attr('data-uid')}']`).attr('data-name', html_encode(new_name));
             $(`.window-${options.uid}`).attr('data-name', html_encode(new_name));
 
-            // Set new title attribute
+            // Set new `title` attribute
             $(`.item[data-uid='${$(el_item).attr('data-uid')}']`).attr('title', html_encode(new_name));
             $(`.window-${options.uid}`).attr('title', html_encode(new_name));
 
-            // Set new value for item-name-editor
+            // Set new value for `item-name-editor`
             $(`.item[data-uid='${$(el_item).attr('data-uid')}'] .item-name-editor`).val(html_encode(new_name));
             $(`.item[data-uid='${$(el_item).attr('data-uid')}'] .item-name`).attr('title', html_encode(new_name));
 
-            // Set new data-path
+            // Set new `data-path` attribute
             options.path = path.join( path.dirname(options.path), options.name);
             const new_path = options.path;
             $(el_item).attr('data-path', new_path);
@@ -3208,7 +3032,7 @@ window.rename_file = async(options, new_name, old_name, old_path, el_item, el_it
                     $(this).text(new_name);
             });
 
-            // Update the paths of all elements whose paths start with old_path
+            // Update the paths of all elements whose paths start with `old_path`
             $(`[data-path^="${html_encode(old_path) + '/'}"]`).each(function(){
                 const new_el_path = _.replace($(this).attr('data-path'), old_path + '/', new_path+'/');
                 $(this).attr('data-path', new_el_path);
@@ -3216,15 +3040,15 @@ window.rename_file = async(options, new_name, old_name, old_path, el_item, el_it
 
             // Update the 'Sites Cache'
             if($(el_item).attr('data-has_website') === '1')
-                await update_sites_cache();
+                await window.update_sites_cache();
 
-            // Update website_url
-            website_url = determine_website_url(new_path);
+            // Update `website_url`
+            website_url = window.determine_website_url(new_path);
             $(el_item).attr('data-website_url', website_url);
 
             // Update all exact-matching windows
             $(`.window-${options.uid}`).each(function(){
-                update_window_path(this, options.path);
+                window.update_window_path(this, options.path);
             })
 
             // Set new name for corresponding open windows
@@ -3232,12 +3056,12 @@ window.rename_file = async(options, new_name, old_name, old_path, el_item, el_it
 
             // Re-sort all matching item containers
             $(`.item[data-uid='${$(el_item).attr('data-uid')}']`).parent('.item-container').each(function(){
-                sort_items(this, $(el_item).closest('.item-container').attr('data-sort_by'), $(el_item).closest('.item-container').attr('data-sort_order'));
+                window.sort_items(this, $(el_item).closest('.item-container').attr('data-sort_by'), $(el_item).closest('.item-container').attr('data-sort_order'));
             })
         },
         error: function (err){
             // reset to old name
-            $(el_item_name).text(truncate_filename(options.name, TRUNCATE_LENGTH));
+            $(el_item_name).text(truncate_filename(options.name));
             $(el_item_name).show();
 
             // hide item name editor
@@ -3271,28 +3095,28 @@ window.delete_item_with_path = async function(path){
 }
 
 window.undo_last_action = async()=>{
-    if (actions_history.length > 0) {
-        const last_action = actions_history.pop();
+    if (window.actions_history.length > 0) {
+        const last_action = window.actions_history.pop();
 
         // Undo the create file action
         if (last_action.operation === 'create_file' || last_action.operation === 'create_folder') {
             const lastCreatedItem = last_action.data;
-            undo_create_file_or_folder(lastCreatedItem); 
+            window.undo_create_file_or_folder(lastCreatedItem);
         } else if(last_action.operation === 'rename') {
             const {options, new_name, old_name, old_path, el_item, el_item_name, el_item_icon, el_item_name_editor, website_url}  = last_action.data;
-            rename_file(options, old_name, new_name, old_path, el_item, el_item_name, el_item_icon, el_item_name_editor, website_url, true); 
+            window.rename_file(options, old_name, new_name, old_path, el_item, el_item_name, el_item_icon, el_item_name_editor, website_url, true);
         } else if(last_action.operation === 'upload') {
             const files = last_action.data;
-            undo_upload(files);
+            window.undo_upload(files);
         } else if(last_action.operation === 'copy') {
             const files = last_action.data;
-            undo_copy(files);
+            window.undo_copy(files);
         } else if(last_action.operation === 'move') {
             const items = last_action.data;
-            undo_move(items);
+            window.undo_move(items);
         } else if(last_action.operation === 'delete') {
             const items = last_action.data;
-            undo_delete(items);
+            window.undo_delete(items);
         }
     }
 }
@@ -3315,23 +3139,23 @@ window.undo_copy = async(files)=>{
 
 window.undo_move = async(items)=>{
     for (const item of items) {
-        const el = await get_html_element_from_options(item.options);
+        const el = await window.get_html_element_from_options(item.options);
         console.log(item.original_path)
-        move_items([el], path.dirname(item.original_path), true);
+        window.move_items([el], path.dirname(item.original_path), true);
     }
 }
 
 window.undo_delete = async(items)=>{
     for (const item of items) {
-        const el = await get_html_element_from_options(item.options);
+        const el = await window.get_html_element_from_options(item.options);
         let metadata = $(el).attr('data-metadata') === '' ? {} : JSON.parse($(el).attr('data-metadata'))
-        move_items([el], path.dirname(metadata.original_path), true);
+        window.move_items([el], path.dirname(metadata.original_path), true);
     }
 }
 
 
 window.get_html_element_from_options = async function(options){
-    const item_id = global_element_id++;
+    const item_id = window.global_element_id++;
     
     options.disabled = options.disabled ?? false;
     options.visible = options.visible ?? 'visible'; // one of 'visible', 'revealed', 'hidden'
@@ -3348,7 +3172,7 @@ window.get_html_element_from_options = async function(options){
     options.sort_container_after_append = (options.sort_container_after_append !== undefined ? options.sort_container_after_append : false);
     const is_shared_with_me = (options.path !== '/'+window.user.username && !options.path.startsWith('/'+window.user.username+'/'));
 
-    let website_url = determine_website_url(options.path);
+    let website_url = window.determine_website_url(options.path);
 
     // do a quick check to see if the target parent has any file type restrictions
     const appendto_allowed_file_types = $(options.appendTo).attr('data-allowed_file_types')
@@ -3390,7 +3214,7 @@ window.get_html_element_from_options = async function(options){
         h += `</div>`;
         // size
         h += `<div class="item-attr item-attr--size">`;
-            h += `<span>${options.size ? byte_format(options.size) : '-'}</span>`;
+            h += `<span>${options.size ? window.byte_format(options.size) : '-'}</span>`;
         h += `</div>`;
         // type
         h += `<div class="item-attr item-attr--type">`;
@@ -3447,7 +3271,7 @@ window.get_html_element_from_options = async function(options){
         h += `</div>`;
 
         // name
-        h += `<span class="item-name" data-item-id="${item_id}" title="${html_encode(options.name)}">${html_encode(truncate_filename(options.name, TRUNCATE_LENGTH)).replaceAll(' ', '&nbsp;')}</span>`
+        h += `<span class="item-name" data-item-id="${item_id}" title="${html_encode(options.name)}">${html_encode(truncate_filename(options.name)).replaceAll(' ', '&nbsp;')}</span>`
         // name editor
         h += `<textarea class="item-name-editor hide-scrollbar" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" data-gramm_editor="false">${html_encode(options.name)}</textarea>`
     h += `</div>`;
@@ -3462,9 +3286,9 @@ window.store_auto_arrange_preference = (preference)=>{
 
 window.get_auto_arrange_data = async()=>{
     const preferenceValue = await puter.kv.get('user_preferences.auto_arrange_desktop');
-    is_auto_arrange_enabled = preferenceValue === null ? true : preferenceValue;
+    window.is_auto_arrange_enabled = preferenceValue === null ? true : preferenceValue;
     const positions = await puter.kv.get('desktop_item_positions')
-    desktop_item_positions =  (!positions || typeof positions !== 'object' || Array.isArray(positions)) ? {} : positions;
+    window.desktop_item_positions =  (!positions || typeof positions !== 'object' || Array.isArray(positions)) ? {} : positions;
 }
 
 window.clear_desktop_item_positions = async(el_desktop)=>{
@@ -3474,14 +3298,14 @@ window.clear_desktop_item_positions = async(el_desktop)=>{
         $(el_item).css('left', '');
         $(el_item).css('top', '');
     });
-    if(reset_item_positions){
-        delete_desktop_item_positions()
+    if(window.reset_item_positions){
+        window.delete_desktop_item_positions()
     }
 }
 
 window.set_desktop_item_positions = async(el_desktop)=>{
     $(el_desktop).find('.item').each(async function(){
-        const position = desktop_item_positions[$(this).attr('data-uid')]
+        const position = window.desktop_item_positions[$(this).attr('data-uid')]
         const el_item = $(this)[0];
         if(position){
             $(el_item).css('position', 'absolute');
@@ -3492,11 +3316,11 @@ window.set_desktop_item_positions = async(el_desktop)=>{
 }
 
 window.save_desktop_item_positions = ()=>{
-    puter.kv.set('desktop_item_positions', desktop_item_positions);
+    puter.kv.set('desktop_item_positions', window.desktop_item_positions);
 }
 
 window.delete_desktop_item_positions = ()=>{
-    desktop_item_positions = {}
+    window.desktop_item_positions = {}
     puter.kv.del('desktop_item_positions');
 }
 
@@ -3504,7 +3328,7 @@ window.change_clock_visible = (clock_visible) => {
     let newValue = clock_visible || window.user_preferences.clock_visible;
     
     
-    newValue === 'auto' && is_fullscreen() ? $('#clock').show() : $('#clock').hide();
+    newValue === 'auto' && window.is_fullscreen() ? $('#clock').show() : $('#clock').hide();
 
     newValue === 'show' && $('#clock').show();
     newValue === 'hide' && $('#clock').hide();
@@ -3528,14 +3352,14 @@ window.window_for_app_instance = (instance_id) => {
 
 // Finds the `iframe` element for the given app instance ID
 window.iframe_for_app_instance = (instance_id) => {
-    return $(window_for_app_instance(instance_id)).find('.window-app-iframe').get(0);
+    return $(window.window_for_app_instance(instance_id)).find('.window-app-iframe').get(0);
 };
 
 // Run any callbacks to say that the app has launched
 window.report_app_launched = (instance_id, { uses_sdk = true }) => {
     const child_launch_callback = window.child_launch_callbacks[instance_id];
     if (child_launch_callback) {
-        const parent_iframe = iframe_for_app_instance(child_launch_callback.parent_instance_id);
+        const parent_iframe = window.iframe_for_app_instance(child_launch_callback.parent_instance_id);
         // send confirmation to requester window
         parent_iframe.contentWindow.postMessage({
             msg: 'childAppLaunched',
@@ -3548,8 +3372,8 @@ window.report_app_launched = (instance_id, { uses_sdk = true }) => {
 };
 
 // Run any callbacks to say that the app has closed
-window.report_app_closed = (instance_id) => {
-    const el_window = window_for_app_instance(instance_id);
+window.report_app_closed = (instance_id, status_code) => {
+    const el_window = window.window_for_app_instance(instance_id);
 
     // notify parent app, if we have one, that we're closing
     const parent_id = el_window.dataset['parent_instance_id'];
@@ -3558,6 +3382,7 @@ window.report_app_closed = (instance_id) => {
         parent.contentWindow.postMessage({
             msg: 'appClosed',
             appInstanceID: instance_id,
+            statusCode: status_code ?? 0,
         }, '*');
     }
 
@@ -3567,8 +3392,24 @@ window.report_app_closed = (instance_id) => {
         child.contentWindow.postMessage({
             msg: 'appClosed',
             appInstanceID: instance_id,
+            statusCode: status_code ?? 0,
         }, '*');
     });
 
     // TODO: Once other AppConnections exist, those will need notifying too.
+};
+
+window.set_menu_item_prop = (items, item_id, prop, val) => {
+    // iterate over items
+    for (const item of items) {
+        // find the item with the given item_id
+        if (item.id === item_id) {
+            // set the property value
+            item[prop] = val;
+            break;
+        }
+        else if(item.items){
+            set_menu_item_prop(item.items, item_id, prop, val);
+        }
+    }
 };

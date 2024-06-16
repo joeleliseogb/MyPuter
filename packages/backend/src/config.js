@@ -62,6 +62,8 @@ config.thumb_width = 80;
 config.thumb_height = 80;
 config.app_max_icon_size = 5*1024*1024;
 
+config.defaultjs_asset_path = '../../';
+
 // config.origin = config.protocol + '://' + config.domain;
 // config.api_base_url = config.protocol + '://api.' + config.domain;
 // config.social_card = `${config.origin}/assets/img/screenshot.png`;
@@ -77,6 +79,7 @@ config.puter_hosted_data = {
     const path_ = require('path');
     config.assets = {
         gui: path_.join(__dirname, '../../..'),
+        gui_profile: 'development',
     };
 }
 
@@ -172,9 +175,25 @@ const config_pointer = {};
 // We'd like to store values changed at runtime separately
 // for easier runtime debugging
 {
-    const config_runtime_values = {};
+    const config_runtime_values = {
+        $: 'runtime-values'
+    };
     config_runtime_values.__proto__ = config_to_export;
     config_to_export = config_runtime_values
+
+    // These can be difficult to find and cause painful
+    // confusing issues, so we log any time this happens
+    config_to_export = new Proxy(config_to_export, {
+        set: (target, prop, value, receiver) => {
+            console.log(
+                '\x1B[36;1mCONFIGURATION MUTATED AT RUNTIME\x1B[0m',
+                prop, 'to', value
+            );
+            // console.log(new Error('stack trace to find configuration mutation'));
+            target[prop] = value;
+            return true;
+        }
+    })
 }
 
 module.exports = config_to_export;

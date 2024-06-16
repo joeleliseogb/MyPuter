@@ -39,6 +39,12 @@ class AuthService extends BaseService {
         this.svc_session = await this.services.get('session');
 
         this.sessions = {};
+
+        const svc_token = await this.services.get('token');
+        this.modules.jwt = {
+            sign: (payload, _, options) => svc_token.sign('auth', payload, options),
+            verify: (token, _) => svc_token.verify('auth', token),
+        };
     }
 
     async authenticate_from_token (token) {
@@ -49,27 +55,6 @@ class AuthService extends BaseService {
 
         if ( ! decoded.hasOwnProperty('type') ) {
             throw new LegacyTokenError();
-            const user = await this.db.requireRead(
-                "SELECT * FROM `user` WHERE `uuid` = ?  LIMIT 1",
-                [decoded.uuid],
-            );
-
-            if ( ! user[0] ) {
-                throw APIError.create('token_auth_failed');
-            }
-
-            if ( user[0].suspended ) {
-                throw APIError.create('account_suspended');
-            }
-
-            const actor_type = new UserActorType({
-                user: user[0],
-            });
-
-            return new Actor({
-                user_uid: decoded.uuid,
-                type: actor_type,
-            });
         }
 
         if ( decoded.type === 'session' ) {
@@ -229,7 +214,7 @@ class AuthService extends BaseService {
             type: 'session',
             version: '0.0.0',
             uuid: session.uuid,
-            meta: session.meta,
+            // meta: session.meta,
             user_uid: user.uuid,
         }, this.global_config.jwt_secret);
 
@@ -380,21 +365,21 @@ class AuthService extends BaseService {
                 mysql: () => session.meta,
                 otherwise: () => JSON.parse(session.meta ?? "{}")
             })();
+            sessions.push(session);
+        };
+
+        for ( const session of sessions ) {
             if ( session.uuid === actor.type.session ) {
                 session.current = true;
             }
-            sessions.push(session);
-        };
+        }
 
         return sessions;
     }
 
     async revoke_session (actor, uuid) {
         delete this.sessions[uuid];
-        await this.db.write(
-            `DELETE FROM sessions WHERE uuid = ? AND user_id = ?`,
-            [uuid, actor.type.user.id]
-        );
+        this.svc_session.remove_session(uuid);
     }
 
     async get_user_app_token_from_origin (origin) {

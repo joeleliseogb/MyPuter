@@ -22,6 +22,7 @@ import { CreateFilesystemProvider } from './platform/puter/filesystem.js';
 import { CreateDriversProvider } from './platform/puter/drivers.js';
 import { XDocumentPTT } from './pty/XDocumentPTT.js';
 import { CreateEnvProvider } from './platform/puter/env.js';
+import { CreateSystemProvider } from './platform/puter/system.js';
 
 window.main_shell = async () => {
     const config = {};
@@ -62,7 +63,6 @@ window.main_shell = async () => {
     if ( config['puter.auth.token'] ) {
         await puterSDK.setAuthToken(config['puter.auth.token']);
     }
-    await puterSDK.setAPIOrigin(config['puter.api_origin']);
 
     const ptt = new XDocumentPTT(terminal);
     await launchPuterShell(new Context({
@@ -74,6 +74,7 @@ window.main_shell = async () => {
             filesystem: CreateFilesystemProvider({ puterSDK }),
             drivers: CreateDriversProvider({ puterSDK }),
             env: CreateEnvProvider({ config }),
+            system: CreateSystemProvider({ puterSDK })
         }),
     }));
 };

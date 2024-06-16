@@ -158,11 +158,31 @@ class PermissionUtil {
         }
         return unescaped_str;
     }
+    
+    static escape_permission_component (component) {
+        let escaped_str = '';
+        for ( let i = 0 ; i < component.length ; i++ ) {
+            const c = component[i];
+            if ( c === ':' ) {
+                escaped_str += '\\C';
+                continue;
+            }
+            escaped_str += c;
+        }
+        return escaped_str;
+    }
 
     static split (permission) {
         return permission
             .split(':')
             .map(PermissionUtil.unescape_permission_component)
+            ;
+    }
+    
+    static join (...components) {
+        return components
+            .map(PermissionUtil.escape_permission_component)
+            .join(':')
             ;
     }
 }
@@ -562,6 +582,25 @@ class PermissionService extends BaseService {
                 meta?.reason || 'revoked via PermissionService',
             ]
         );
+    }
+    
+    /**
+     * List the users that have any permissions granted to the
+     * specified user.
+     */
+    async list_user_permission_issuers (user) {
+        const rows = await this.db.read(
+            'SELECT DISTINCT issuer_user_id FROM `user_to_user_permissions` ' +
+            'WHERE `holder_user_id` = ?',
+            [ user.id ],
+        );
+        
+        const users = [];
+        for ( const row of rows ) {
+            users.push(await get_user({ id: row.issuer_user_id }));
+        }
+
+        return users;
     }
 
     get_parent_permissions (permission) {
